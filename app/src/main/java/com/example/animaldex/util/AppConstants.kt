@@ -12,6 +12,19 @@ val allAnimalsColor =
     Color(0xFF274C77)
 
 
+// Fond gris foncé uniforme pour toutes les pages de grille (groupes/animaux),
+// plus sombre que les cases, identique partout pour ne pas créer de
+// discontinuité visuelle lors des transitions de glissement entre écrans.
+val PageBackgroundColor =
+    Color(0xFF1E1E20)
+
+
+// Gris clair pour le bouton "ANIMAL SCANNER", nettement plus clair que
+// PageBackgroundColor pour rester visible sur le fond de la page d'accueil.
+val CameraButtonColor =
+    Color(0xFFB5B5BC)
+
+
 val continents = listOf(
 
     ContinentData(

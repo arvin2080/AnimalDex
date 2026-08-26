@@ -87,157 +87,192 @@ fun AnimalDetailScreen(
 
             Spacer(
                 modifier =
-                    Modifier.height(40.dp)
+                    Modifier.height(16.dp)
             )
 
 
-            Text(
-                text =
-                    animal.displayName.uppercase(),
+            // ----------------------------------------------------
+            // ZONE DU HAUT : trois blocs indépendants dans le même
+            // Box, chacun avec sa propre position :
+            // 1. Image : ancrée en haut à gauche, avec un Spacer
+            //    généreux au-dessus pour la faire descendre.
+            // 2. Nom + sous-titre : ancrés en haut, centrés dans la
+            //    moitié DROITE de l'écran (inchangé).
+            // 3. Infos (CONTINENT, FAMILLE, GENRE, STATUS) : bloc
+            //    séparé, décalé horizontalement pour démarrer juste
+            //    après l'image (pas au milieu de l'écran), et
+            //    décalé verticalement pour rester visuellement sous
+            //    le nom, comme avant.
+            // ----------------------------------------------------
 
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(
-                        horizontal = 8.dp
-                    ),
-
-                color = Color.White,
-
-                fontFamily = GameFont,
-
-                fontSize = 17.sp,
-
-                lineHeight = 18.sp,
-
-                fontWeight =
-                    FontWeight.Black,
-
-                maxLines = 1,
-
-                overflow =
-                    TextOverflow.Ellipsis,
-
-                textAlign =
-                    TextAlign.Center
-            )
-
-
-            Text(
-                text =
-                    animal.scientificName,
-
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = 8.dp
-                    ),
-
-                color =
-                    Color.White.copy(
-                        alpha = 0.80f
-                    ),
-
-                fontSize = 10.sp,
-
-                lineHeight = 11.sp,
-
-                fontStyle =
-                    FontStyle.Italic,
-
-                fontWeight =
-                    FontWeight.Medium,
-
-                maxLines = 1,
-
-                overflow =
-                    TextOverflow.Ellipsis,
-
-                textAlign =
-                    TextAlign.Center
-            )
-
-
-            Spacer(
-                modifier =
-                    Modifier.height(4.dp)
-            )
-
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(108.dp)
                     .padding(
                         horizontal = 7.dp
-                    ),
-
-                verticalAlignment =
-                    Alignment.CenterVertically
+                    )
             ) {
 
-                Box(
+                // 1. Image, avec Spacer dédié au-dessus pour la
+                // décaler vers le bas.
+                Column(
                     modifier = Modifier
-                        .size(102.dp)
-                        .background(
-                            Color.White,
-                            RoundedCornerShape(
-                                12.dp
-                            )
+                        .align(
+                            Alignment.TopStart
                         )
-                        .padding(5.dp),
-
-                    contentAlignment =
-                        Alignment.Center
                 ) {
 
-                    if (
-                        animal.localImagePath
-                            .isNullOrBlank()
+                    Spacer(
+                        modifier =
+                            Modifier.height(32.dp)
+                    )
+
+
+                    Box(
+                        modifier = Modifier
+                            .size(102.dp)
+                            .background(
+                                Color.White,
+                                RoundedCornerShape(
+                                    12.dp
+                                )
+                            )
+                            .padding(5.dp),
+
+                        contentAlignment =
+                            Alignment.Center
                     ) {
 
-                        Text(
-                            text = "?",
+                        if (
+                            animal.localImagePath
+                                .isNullOrBlank()
+                        ) {
 
-                            color = Color.Black,
+                            Text(
+                                text = "?",
 
-                            fontSize = 40.sp,
+                                color = Color.Black,
 
-                            fontWeight =
-                                FontWeight.Black
-                        )
+                                fontSize = 40.sp,
 
-                    } else {
+                                fontWeight =
+                                    FontWeight.Black
+                            )
 
-                        AsyncImage(
-                            model =
-                                animal.localImagePath,
+                        } else {
 
-                            contentDescription =
-                                animal.displayName,
+                            AsyncImage(
+                                model =
+                                    animal.localImagePath,
 
-                            modifier =
-                                Modifier.fillMaxSize(),
+                                contentDescription =
+                                    animal.displayName,
 
-                            contentScale =
-                                ContentScale.Fit
-                        )
+                                modifier =
+                                    Modifier.fillMaxSize(),
+
+                                contentScale =
+                                    ContentScale.Fit
+                            )
+                        }
                     }
                 }
 
 
-                Spacer(
-                    modifier =
-                        Modifier.width(11.dp)
-                )
-
-
+                // 2. Nom + sous-titre, centrés dans la moitié
+                // droite de l'écran, tapables (retour en arrière).
                 Column(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
+                        .align(
+                            Alignment.TopEnd
+                        )
+                        .fillMaxWidth(0.5f)
+                        .pointerInput(Unit) {
 
-                    verticalArrangement =
-                        Arrangement.SpaceEvenly
+                            detectTapGestures(
+                                onTap = {
+                                    onBack()
+                                }
+                            )
+                        },
+
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally
+                ) {
+
+                    Text(
+                        text =
+                            animal.displayName.uppercase(),
+
+                        modifier =
+                            Modifier.fillMaxWidth(),
+
+                        color = Color.White,
+
+                        fontFamily = GameFont,
+
+                        fontSize = 15.sp,
+
+                        lineHeight = 16.sp,
+
+                        fontWeight =
+                            FontWeight.Black,
+
+                        maxLines = 1,
+
+                        overflow =
+                            TextOverflow.Ellipsis,
+
+                        textAlign =
+                            TextAlign.Center
+                    )
+
+
+                    Text(
+                        text =
+                            animal.scientificName,
+
+                        modifier =
+                            Modifier.fillMaxWidth(),
+
+                        color =
+                            Color.White.copy(
+                                alpha = 0.80f
+                            ),
+
+                        fontSize = 9.sp,
+
+                        lineHeight = 10.sp,
+
+                        fontStyle =
+                            FontStyle.Italic,
+
+                        fontWeight =
+                            FontWeight.Medium,
+
+                        maxLines = 1,
+
+                        overflow =
+                            TextOverflow.Ellipsis,
+
+                        textAlign =
+                            TextAlign.Center
+                    )
+                }
+
+
+                // 3. Infos : démarrent juste après l'image (padding
+                // start ≈ largeur de l'image + petit espace), et
+                // décalées vers le bas pour rester sous le nom.
+                Column(
+                    modifier = Modifier
+                        .align(
+                            Alignment.TopStart
+                        )
+                        .padding(
+                            start = 113.dp,
+                            top = 38.dp
+                        )
                 ) {
 
                     DetailInfo(
@@ -254,6 +289,12 @@ fun AnimalDetailScreen(
                             .isNullOrBlank()
                     ) {
 
+                        Spacer(
+                            modifier =
+                                Modifier.height(4.dp)
+                        )
+
+
                         DetailInfo(
                             title = "FAMILLE",
 
@@ -268,6 +309,12 @@ fun AnimalDetailScreen(
                             .isNullOrBlank()
                     ) {
 
+                        Spacer(
+                            modifier =
+                                Modifier.height(4.dp)
+                        )
+
+
                         DetailInfo(
                             title = "GENRE",
 
@@ -275,6 +322,12 @@ fun AnimalDetailScreen(
                                 animal.genus
                         )
                     }
+
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(4.dp)
+                    )
 
 
                     DetailInfo(
@@ -460,23 +513,6 @@ fun AnimalDetailScreen(
                 }
             }
         }
-
-
-        Box(
-            modifier = Modifier
-                .align(
-                    Alignment.BottomEnd
-                )
-                .padding(
-                    end = 9.dp,
-                    bottom = 8.dp
-                )
-        ) {
-
-            CompactBackButton(
-                onClick = onBack
-            )
-        }
     }
 }
 
@@ -534,54 +570,6 @@ fun DetailInfo(
 
             overflow =
                 TextOverflow.Ellipsis
-        )
-    }
-}
-
-
-@Composable
-fun CompactBackButton(
-    onClick: () -> Unit
-) {
-
-    Box(
-        modifier = Modifier
-            .background(
-                Color.Black.copy(
-                    alpha = 0.76f
-                ),
-                RoundedCornerShape(
-                    8.dp
-                )
-            )
-            .pointerInput(Unit) {
-
-                detectTapGestures(
-                    onTap = {
-                        onClick()
-                    }
-                )
-            }
-            .padding(
-                horizontal = 12.dp,
-                vertical = 7.dp
-            ),
-
-        contentAlignment =
-            Alignment.Center
-    ) {
-
-        Text(
-            text = "← BACK",
-
-            color = Color.White,
-
-            fontFamily = GameFont,
-
-            fontSize = 8.sp,
-
-            fontWeight =
-                FontWeight.Black
         )
     }
 }

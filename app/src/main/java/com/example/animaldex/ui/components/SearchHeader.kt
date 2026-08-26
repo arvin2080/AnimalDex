@@ -1,16 +1,20 @@
 package com.example.animaldex.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -30,7 +34,9 @@ fun SearchHeader(
     filterLabel: String,
     filterOptions: List<String>,
     onFilterSelected: (Int) -> Unit,
-    backgroundColor: Color
+    backgroundColor: Color,
+    backButtonColor: Color = Color.White.copy(alpha = 0.18f),
+    onBack: (() -> Unit)? = null
 ) {
 
     var filterMenuOpen by remember {
@@ -40,189 +46,277 @@ fun SearchHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(50.dp)
+            .height(46.dp)
             .background(backgroundColor)
     ) {
 
-        if (!leftText.isNullOrBlank()) {
+        // ----------------------------------------------------
+        // GAUCHE : titre uniquement (plus de flèche retour ici)
+        // ----------------------------------------------------
 
-            Text(
-                text = leftText,
+        Row(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .fillMaxWidth(0.50f)
+                .padding(start = 8.dp),
 
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 9.dp)
-                    .fillMaxWidth(0.42f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
 
-                color = Color.White,
+            if (!leftText.isNullOrBlank()) {
 
-                fontFamily = GameFont,
+                Text(
+                    text = leftText,
 
-                fontSize = 13.sp,
+                    color = Color.White,
 
-                fontWeight = FontWeight.Black,
+                    fontFamily = GameFont,
 
-                maxLines = 1,
+                    fontSize = 13.sp,
 
-                overflow = TextOverflow.Ellipsis
-            )
+                    fontWeight = FontWeight.Black,
+
+                    maxLines = 1,
+
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
 
-        Box(
+        // ----------------------------------------------------
+        // DROITE : barre de recherche (raccourcie) + flèche retour
+        // ----------------------------------------------------
+
+        Row(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .fillMaxWidth(0.43f)
-                .height(37.dp)
-                .padding(end = 4.dp)
-                .background(
-                    Color.White,
-                    RoundedCornerShape(8.dp)
-                )
+                .fillMaxWidth(0.42f)
+                .padding(end = 12.dp),
+
+            verticalAlignment = Alignment.CenterVertically,
+
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
 
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(
-                        start = 9.dp,
-                        end = 43.dp
-                    ),
-
-                contentAlignment = Alignment.CenterStart
+                    .weight(1f)
+                    .height(32.dp)
+                    .background(
+                        Color.White,
+                        RoundedCornerShape(8.dp)
+                    )
             ) {
 
-                if (search.isBlank()) {
-
-                    Text(
-                        text = "SEARCH...",
-
-                        color = Color.Black.copy(
-                            alpha = 0.32f
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = 8.dp,
+                            end = 36.dp
                         ),
 
-                        fontFamily = GameFont,
+                    contentAlignment = Alignment.CenterStart
+                ) {
 
-                        fontSize = 8.sp,
+                    if (search.isBlank()) {
 
-                        fontWeight = FontWeight.Bold
+                        Text(
+                            text = "SEARCH...",
+
+                            color = Color.Black.copy(
+                                alpha = 0.32f
+                            ),
+
+                            fontFamily = GameFont,
+
+                            fontSize = 8.sp,
+
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+
+                    BasicTextField(
+                        value = search,
+
+                        onValueChange = onSearchChange,
+
+                        modifier = Modifier.fillMaxWidth(),
+
+                        singleLine = true,
+
+                        textStyle = TextStyle(
+                            color = Color.Black,
+                            fontFamily = GameFont,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+
+                        cursorBrush = SolidColor(
+                            Color.Black
+                        )
                     )
                 }
 
 
-                BasicTextField(
-                    value = search,
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(33.dp)
+                        .fillMaxHeight()
+                        .pointerInput(filterLabel) {
 
-                    onValueChange = onSearchChange,
+                            detectTapGestures(
+                                onTap = {
+                                    filterMenuOpen = true
+                                }
+                            )
+                        },
 
-                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
 
-                    singleLine = true,
+                    Column(
+                        horizontalAlignment = Alignment.End,
 
-                    textStyle = TextStyle(
-                        color = Color.Black,
-                        fontFamily = GameFont,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
+                        verticalArrangement = Arrangement.spacedBy(
+                            4.dp
+                        )
+                    ) {
 
-                    cursorBrush = SolidColor(
-                        Color.Black
-                    )
-                )
+                        Box(
+                            modifier = Modifier
+                                .width(20.dp)
+                                .height(3.dp)
+                                .background(
+                                    Color.Gray,
+                                    RoundedCornerShape(2.dp)
+                                )
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .width(14.dp)
+                                .height(3.dp)
+                                .background(
+                                    Color.Gray,
+                                    RoundedCornerShape(2.dp)
+                                )
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .width(9.dp)
+                                .height(3.dp)
+                                .background(
+                                    Color.Gray,
+                                    RoundedCornerShape(2.dp)
+                                )
+                        )
+                    }
+
+
+                    DropdownMenu(
+                        expanded = filterMenuOpen,
+
+                        onDismissRequest = {
+                            filterMenuOpen = false
+                        }
+                    ) {
+
+                        filterOptions.forEachIndexed { index, option ->
+
+                            DropdownMenuItem(
+                                text = {
+
+                                    Text(
+                                        text =
+                                            if (option == filterLabel) {
+                                                "●  $option"
+                                            } else {
+                                                "   $option"
+                                            },
+
+                                        fontFamily = GameFont,
+
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                },
+
+                                onClick = {
+
+                                    onFilterSelected(index)
+
+                                    filterMenuOpen = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .width(39.dp)
-                    .fillMaxHeight()
-                    .pointerInput(filterLabel) {
+            if (onBack != null) {
 
-                        detectTapGestures(
-                            onTap = {
-                                filterMenuOpen = true
-                            }
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .background(
+                            backButtonColor,
+                            CircleShape
                         )
-                    },
+                        .pointerInput(Unit) {
 
-                contentAlignment = Alignment.Center
-            ) {
+                            detectTapGestures(
+                                onTap = {
+                                    onBack()
+                                }
+                            )
+                        },
 
-                Column(
-                    horizontalAlignment = Alignment.End,
-
-                    verticalArrangement = Arrangement.spacedBy(
-                        4.dp
-                    )
+                    contentAlignment = Alignment.Center
                 ) {
 
-                    Box(
-                        modifier = Modifier
-                            .width(22.dp)
-                            .height(3.dp)
-                            .background(
-                                Color.Gray,
-                                RoundedCornerShape(2.dp)
-                            )
-                    )
+                    // Flèche dessinée à la main (au lieu du caractère "←"),
+                    // pour garantir un centrage exact au pixel près, sans
+                    // dépendre des métriques asymétriques de la police.
+                    Canvas(
+                        modifier = Modifier.size(13.dp)
+                    ) {
 
-                    Box(
-                        modifier = Modifier
-                            .width(16.dp)
-                            .height(3.dp)
-                            .background(
-                                Color.Gray,
-                                RoundedCornerShape(2.dp)
-                            )
-                    )
+                        val strokeWidthPx = 1.8.dp.toPx()
+                        val w = size.width
+                        val h = size.height
+                        val midY = h / 2f
+                        val headSize = w * 0.42f
 
-                    Box(
-                        modifier = Modifier
-                            .width(10.dp)
-                            .height(3.dp)
-                            .background(
-                                Color.Gray,
-                                RoundedCornerShape(2.dp)
-                            )
-                    )
-                }
+                        // Tige horizontale
+                        drawLine(
+                            color = Color.White,
+                            start = Offset(w, midY),
+                            end = Offset(0f, midY),
+                            strokeWidth = strokeWidthPx,
+                            cap = StrokeCap.Round
+                        )
 
+                        // Pointe : diagonale du haut
+                        drawLine(
+                            color = Color.White,
+                            start = Offset(0f, midY),
+                            end = Offset(headSize, 0f),
+                            strokeWidth = strokeWidthPx,
+                            cap = StrokeCap.Round
+                        )
 
-                DropdownMenu(
-                    expanded = filterMenuOpen,
-
-                    onDismissRequest = {
-                        filterMenuOpen = false
-                    }
-                ) {
-
-                    filterOptions.forEachIndexed { index, option ->
-
-                        DropdownMenuItem(
-                            text = {
-
-                                Text(
-                                    text =
-                                        if (option == filterLabel) {
-                                            "●  $option"
-                                        } else {
-                                            "   $option"
-                                        },
-
-                                    fontFamily = GameFont,
-
-                                    fontWeight = FontWeight.Bold
-                                )
-                            },
-
-                            onClick = {
-
-                                onFilterSelected(index)
-
-                                filterMenuOpen = false
-                            }
+                        // Pointe : diagonale du bas
+                        drawLine(
+                            color = Color.White,
+                            start = Offset(0f, midY),
+                            end = Offset(headSize, h),
+                            strokeWidth = strokeWidthPx,
+                            cap = StrokeCap.Round
                         )
                     }
                 }

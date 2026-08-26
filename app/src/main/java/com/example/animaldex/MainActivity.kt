@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 
-import com.example.animaldex.navigation.AnimalDexApp
+import com.example.animaldex.naviguation.AnimalDexApp
 import com.example.animaldex.ui.theme.AnimalDexTheme
 
 

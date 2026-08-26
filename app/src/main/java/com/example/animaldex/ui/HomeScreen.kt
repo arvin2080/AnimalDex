@@ -3,9 +3,6 @@ package com.example.animaldex.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.material3.Text
@@ -16,12 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-import coil3.compose.AsyncImage
 
 import com.example.animaldex.model.Animal
 import com.example.animaldex.model.ContinentData
@@ -30,12 +24,28 @@ import com.example.animaldex.model.IconGroup
 
 import com.example.animaldex.ui.components.SearchHeader
 
+import com.example.animaldex.util.CameraButtonColor
 import com.example.animaldex.util.GameFont
+import com.example.animaldex.util.PageBackgroundColor
 import com.example.animaldex.util.allAnimalsColor
 import com.example.animaldex.util.animalMatchesSearch
 import com.example.animaldex.util.applyGroupFilter
 import com.example.animaldex.util.buildIconGroups
 import com.example.animaldex.util.continents
+
+
+// ============================================================
+// CONTINENT GRID ENTRY
+// ============================================================
+
+// Associe un continent au nombre d'animaux découverts/total pour ce
+// continent, pour l'affichage façon compteur "x/y" dans la grille
+// d'accueil (même style que les groupes d'animaux).
+data class ContinentGridEntry(
+    val continent: ContinentData,
+    val discoveredCount: Int,
+    val totalCount: Int
+)
 
 
 // ============================================================
@@ -66,7 +76,7 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                Color(0xFFEEF3F8)
+                PageBackgroundColor
             )
     ) {
 
@@ -113,7 +123,7 @@ fun HomeScreen(
 
 
         // ====================================================
-        // NORMAL CONTINENT MENU
+        // NORMAL CONTINENT GRID
         // ====================================================
 
         if (search.isBlank()) {
@@ -190,7 +200,7 @@ fun CameraMenuButton(
             )
             .background(
                 color =
-                    Color(0xFF172A3A),
+                    CameraButtonColor,
 
                 shape =
                     RoundedCornerShape(
@@ -252,7 +262,7 @@ fun CameraMenuButton(
                         )
                         .background(
                             color =
-                                Color(0xFF172A3A),
+                                CameraButtonColor,
 
                             shape =
                                 RoundedCornerShape(
@@ -276,7 +286,7 @@ fun CameraMenuButton(
                     "ANIMAL SCANNER",
 
                 color =
-                    Color.White,
+                    PageBackgroundColor,
 
                 fontFamily =
                     GameFont,
@@ -293,7 +303,7 @@ fun CameraMenuButton(
 
 
 // ============================================================
-// CONTINENT MENU
+// CONTINENT GRID (grille de 9, une case par continent)
 // ============================================================
 
 @Composable
@@ -303,215 +313,76 @@ fun ContinentMenuBody(
     onContinentSelected: (ContinentData) -> Unit
 ) {
 
-    val listState =
-        rememberLazyListState()
-
-
-    LazyColumn(
-        state =
-            listState,
-
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight()
-            .padding(
-                horizontal =
-                    7.dp,
-
-                vertical =
-                    7.dp
-            ),
-
-        verticalArrangement =
-            Arrangement.spacedBy(
-                8.dp
-            )
-    ) {
-
-        itemsIndexed(
-            continents
-        ) { _, continent ->
-
-            // ================================================
-            // ANIMALS OF THIS CONTINENT
-            // ================================================
-
-            val continentAnimals =
-                animals.filter {
-
-                    it.continents.contains(
-                        continent.name
-                    )
-                }
-
-
-            // ================================================
-            // ICON GROUPS
-            // ================================================
-
-            val filteredGroups =
-                applyGroupFilter(
-                    buildIconGroups(
-                        continentAnimals
-                    ),
-                    groupFilter
-                )
-
-
-            // ================================================
-            // SHOW SOME ICON EXAMPLES
-            // ================================================
-
-            val examples =
-                filteredGroups.take(
-                    4
-                )
-
-
-            ContinentCard(
-                continent =
-                    continent,
-
-                examples =
-                    examples,
-
-                onOpen = {
-
-                    onContinentSelected(
-                        continent
-                    )
-                }
-            )
-        }
-
-
-        item {
-
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        14.dp
-                    )
-            )
-        }
-    }
-}
-
-
-// ============================================================
-// CONTINENT CARD
-// ============================================================
-
-@Composable
-fun ContinentCard(
-    continent: ContinentData,
-    examples: List<IconGroup>,
-    onOpen: () -> Unit
-) {
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(
-                76.dp
-            )
-            .background(
-                color =
-                    continent.normalColor,
-
-                shape =
-                    RoundedCornerShape(
-                        13.dp
-                    )
-            )
-            .pointerInput(
-                continent.name
-            ) {
-
-                detectTapGestures(
-                    onTap = {
-
-                        onOpen()
-                    }
-                )
-            }
-            .padding(
-                horizontal =
-                    13.dp
-            ),
-
-        verticalAlignment =
-            Alignment.CenterVertically
-    ) {
-
-        // ====================================================
-        // CONTINENT NAME
-        // ====================================================
-
-        Text(
-            text =
-                continent.name,
-
-            modifier =
-                Modifier.weight(
-                    1f
-                ),
-
-            color =
-                Color.White,
-
-            fontFamily =
-                GameFont,
-
-            fontSize =
-                16.sp,
-
-            fontWeight =
-                FontWeight.Black,
-
-            maxLines =
-                2
-        )
-
-
-        // ====================================================
-        // EXAMPLE ANIMAL ICONS
-        // ====================================================
-
-        Row(
-            horizontalArrangement =
-                Arrangement.spacedBy(
-                    6.dp
-                ),
-
-            verticalAlignment =
-                Alignment.CenterVertically
+    val entries =
+        remember(
+            animals
         ) {
 
-            examples.forEach { group ->
+            continents.map { continent ->
 
-                if (
-                    !group.imagePath
-                        .isNullOrBlank()
-                ) {
+                val continentAnimals =
+                    animals.filter {
 
-                    AsyncImage(
-                        model =
-                            group.imagePath,
+                        it.continents.contains(
+                            continent.name
+                        )
+                    }
 
-                        contentDescription =
-                            group.displayName,
 
-                        modifier =
-                            Modifier.size(
-                                43.dp
-                            ),
+                ContinentGridEntry(
+                    continent = continent,
 
-                        contentScale =
-                            ContentScale.Fit
-                    )
-                }
+                    discoveredCount =
+                        continentAnimals.count {
+                            it.discovered
+                        },
+
+                    totalCount =
+                        continentAnimals.size
+                )
             }
         }
-    }
+
+
+    // Le filtre du header (ALL / A-Z / DISCOVERED) trie maintenant les
+    // continents eux-mêmes, puisque chaque case représente un continent
+    // entier (il n'y a plus d'icônes d'exemples à filtrer à l'intérieur).
+    val orderedEntries =
+        when (groupFilter) {
+
+            GroupFilter.ALL ->
+                entries
+
+            GroupFilter.ALPHABETICAL ->
+                entries.sortedBy {
+                    it.continent.name.lowercase()
+                }
+
+            GroupFilter.DISCOVERED ->
+                entries.sortedWith(
+
+                    compareByDescending<ContinentGridEntry> {
+
+                        it.discoveredCount > 0
+                    }
+
+                        .thenByDescending {
+
+                            it.discoveredCount
+                        }
+
+                        .thenBy {
+
+                            it.continent.name.lowercase()
+                        }
+                )
+        }
+
+
+    PagedContinentGrid(
+        entries = orderedEntries,
+
+        onContinentSelected =
+            onContinentSelected
+    )
 }

@@ -15,6 +15,8 @@ import com.example.animaldex.util.*
 fun GroupAnimalsScreen(
     group: IconGroup,
     color: Color,
+    currentPage: Int,
+    onPageChange: (Int) -> Unit,
     onAnimalSelected: (Animal) -> Unit,
     onBack: () -> Unit
 ) {
@@ -55,7 +57,7 @@ fun GroupAnimalsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(color)
+            .background(PageBackgroundColor)
     ) {
 
         SearchHeader(
@@ -82,13 +84,15 @@ fun GroupAnimalsScreen(
                     AnimalFilter.entries[index]
             },
 
-            backgroundColor = color
+            backgroundColor = PageBackgroundColor,
+
+            onBack = onBack
         )
 
 
         if (animals.isEmpty()) {
 
-            NoResultBody(color)
+            NoResultBody(PageBackgroundColor)
 
         } else {
 
@@ -97,12 +101,173 @@ fun GroupAnimalsScreen(
 
                 color = color,
 
-                showBack = true,
+                showBack = false,
 
                 onBack = onBack,
 
                 onAnimalSelected =
-                    onAnimalSelected
+                    onAnimalSelected,
+
+                initialPageIndex =
+                    currentPage,
+
+                onPageIndexChanged =
+                    onPageChange
+            )
+        }
+    }
+}
+
+
+@Composable
+fun SearchGroupsBody(
+    groups: List<IconGroup>,
+    color: Color,
+    onGroupSelected: (IconGroup) -> Unit
+) {
+
+    if (groups.isEmpty()) {
+
+        NoResultBody(PageBackgroundColor)
+
+        return
+    }
+
+
+    PagedGroupGrid(
+        groups = groups,
+
+        color = color,
+
+        showBack = false,
+
+        onBack = {},
+
+        onGroupSelected =
+            onGroupSelected
+    )
+}
+
+
+@Composable
+fun IconGroupsScreen(
+    continent: ContinentData,
+    allAnimals: List<Animal>,
+    currentPage: Int,
+    onPageChange: (Int) -> Unit,
+    onGroupSelected: (IconGroup) -> Unit,
+    onBack: () -> Unit
+) {
+
+    var search by remember(
+        continent.name
+    ) {
+        mutableStateOf("")
+    }
+
+
+    var filter by remember(
+        continent.name
+    ) {
+        mutableStateOf(
+            GroupFilter.ALL
+        )
+    }
+
+
+    val continentAnimals =
+        remember(
+            continent.name,
+            allAnimals
+        ) {
+
+            allAnimals.filter {
+
+                it.continents.contains(
+                    continent.name
+                )
+            }
+        }
+
+
+    val searchedAnimals =
+        continentAnimals.filter {
+
+            animalMatchesSearch(
+                it,
+                search
+            )
+        }
+
+
+    val groups =
+        applyGroupFilter(
+            buildIconGroups(
+                searchedAnimals
+            ),
+            filter
+        )
+
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PageBackgroundColor)
+    ) {
+
+        SearchHeader(
+            leftText = null,
+
+            search = search,
+
+            onSearchChange = {
+                search = it
+            },
+
+            filterLabel =
+                filter.label,
+
+            filterOptions =
+                GroupFilter.entries.map {
+                    it.label
+                },
+
+            onFilterSelected = { index ->
+
+                filter =
+                    GroupFilter.entries[index]
+            },
+
+            backgroundColor = PageBackgroundColor,
+
+            onBack = onBack
+        )
+
+
+        if (groups.isEmpty()) {
+
+            NoResultBody(PageBackgroundColor)
+
+        } else {
+
+            PagedGroupGrid(
+                groups = groups,
+
+                color =
+                    continent.normalColor,
+
+                showBack = false,
+
+                onBack = onBack,
+
+                onGroupSelected =
+                    onGroupSelected,
+
+                initialPageIndex =
+                    currentPage,
+
+                onPageIndexChanged =
+                    onPageChange
             )
         }
     }

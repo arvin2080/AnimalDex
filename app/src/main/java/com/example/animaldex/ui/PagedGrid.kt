@@ -1,5 +1,12 @@
 package com.example.animaldex.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -25,8 +32,14 @@ import coil3.compose.AsyncImage
 import kotlin.math.abs
 
 import com.example.animaldex.model.Animal
+import com.example.animaldex.model.ContinentData
 import com.example.animaldex.model.IconGroup
 import com.example.animaldex.util.GameFont
+import com.example.animaldex.util.PageBackgroundColor
+
+
+// Fond gris foncé par défaut pour les cases non capturées, quel que soit le continent
+val UndiscoveredCardColor = Color(0xFF3A3A3D)
 
 
 fun isConfirmKey(
@@ -46,7 +59,9 @@ fun PagedGroupGrid(
     color: Color,
     showBack: Boolean,
     onBack: () -> Unit,
-    onGroupSelected: (IconGroup) -> Unit
+    onGroupSelected: (IconGroup) -> Unit,
+    initialPageIndex: Int = 0,
+    onPageIndexChanged: (Int) -> Unit = {}
 ) {
 
     PagedGrid(
@@ -58,6 +73,10 @@ fun PagedGroupGrid(
 
         onBack = onBack,
 
+        initialPageIndex = initialPageIndex,
+
+        onPageIndexChanged = onPageIndexChanged,
+
         onOpenIndex = { index ->
             onGroupSelected(
                 groups[index]
@@ -67,6 +86,8 @@ fun PagedGroupGrid(
 
         IconGroupItem(
             group = groups[index],
+
+            continentColor = color,
 
             selected = selected,
 
@@ -84,7 +105,9 @@ fun PagedAnimalGrid(
     color: Color,
     showBack: Boolean,
     onBack: () -> Unit,
-    onAnimalSelected: (Animal) -> Unit
+    onAnimalSelected: (Animal) -> Unit,
+    initialPageIndex: Int = 0,
+    onPageIndexChanged: (Int) -> Unit = {}
 ) {
 
     PagedGrid(
@@ -96,6 +119,10 @@ fun PagedAnimalGrid(
 
         onBack = onBack,
 
+        initialPageIndex = initialPageIndex,
+
+        onPageIndexChanged = onPageIndexChanged,
+
         onOpenIndex = { index ->
             onAnimalSelected(
                 animals[index]
@@ -105,6 +132,55 @@ fun PagedAnimalGrid(
 
         AnimalGridItem(
             animal = animals[index],
+
+            continentColor = color,
+
+            selected = selected,
+
+            onTap = onTap,
+
+            onLongPress = onLongPress
+        )
+    }
+}
+
+
+@Composable
+fun PagedContinentGrid(
+    entries: List<ContinentGridEntry>,
+    onContinentSelected: (ContinentData) -> Unit,
+    initialPageIndex: Int = 0,
+    onPageIndexChanged: (Int) -> Unit = {}
+) {
+
+    PagedGrid(
+        itemCount = entries.size,
+
+        color = PageBackgroundColor,
+
+        showBack = false,
+
+        onBack = {},
+
+        // Un seul continent par case, toujours 9 au total : jamais plus
+        // d'une page, donc l'indicateur "x / y" et la barre du bas n'ont
+        // aucune utilité ici. On les masque pour laisser les cases
+        // s'étendre jusqu'en bas de l'écran.
+        showPageIndicator = false,
+
+        initialPageIndex = initialPageIndex,
+
+        onPageIndexChanged = onPageIndexChanged,
+
+        onOpenIndex = { index ->
+            onContinentSelected(
+                entries[index].continent
+            )
+        }
+    ) { index, selected, onTap, onLongPress ->
+
+        ContinentGridItem(
+            entry = entries[index],
 
             selected = selected,
 
@@ -123,6 +199,9 @@ fun PagedGrid(
     showBack: Boolean,
     onBack: () -> Unit,
     onOpenIndex: (Int) -> Unit,
+    initialPageIndex: Int = 0,
+    onPageIndexChanged: (Int) -> Unit = {},
+    showPageIndicator: Boolean = true,
 
     itemContent: @Composable (
         index: Int,
@@ -149,10 +228,17 @@ fun PagedGrid(
         }
 
 
+    // Page de départ : celle fournie par l'appelant (pour reprendre où on
+    // était), ramenée dans les bornes valides.
     var pageIndex by remember(
         itemCount
     ) {
-        mutableIntStateOf(0)
+        mutableIntStateOf(
+            initialPageIndex.coerceIn(
+                0,
+                pageCount - 1
+            )
+        )
     }
 
 
@@ -185,23 +271,13 @@ fun PagedGrid(
     }
 
 
-    LaunchedEffect(itemCount) {
+    // Prévient l'appelant à chaque changement de page, pour qu'il puisse
+    // la mémoriser (ex. remonter jusqu'à AnimalDexApp) et la redonner
+    // en initialPageIndex si cet écran est recréé plus tard.
+    LaunchedEffect(pageIndex) {
 
-        pageIndex = 0
-
-        selectedLocalIndex = 0
+        onPageIndexChanged(pageIndex)
     }
-
-
-    val firstIndex =
-        pageIndex * pageSize
-
-
-    val pageItemCount =
-        minOf(
-            pageSize,
-            itemCount - firstIndex
-        ).coerceAtLeast(0)
 
 
     fun previousPage() {
@@ -220,8 +296,7 @@ fun PagedGrid(
     fun nextPage() {
 
         if (
-            pageIndex <
-            pageCount - 1
+            pageIndex < pageCount - 1
         ) {
 
             pageIndex++
@@ -236,7 +311,7 @@ fun PagedGrid(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(color)
+            .background(PageBackgroundColor)
             .pointerInput(
                 pageIndex,
                 pageCount
@@ -299,6 +374,13 @@ fun PagedGrid(
                 }
 
 
+                val pageItemCountForKeys =
+                    minOf(
+                        pageSize,
+                        itemCount - pageIndex * pageSize
+                    ).coerceAtLeast(0)
+
+
                 if (backSelected) {
 
                     when {
@@ -309,11 +391,11 @@ fun PagedGrid(
                             backSelected = false
 
                             if (
-                                pageItemCount > 0
+                                pageItemCountForKeys > 0
                             ) {
 
                                 selectedLocalIndex =
-                                    pageItemCount - 1
+                                    pageItemCountForKeys - 1
                             }
 
                             true
@@ -353,10 +435,8 @@ fun PagedGrid(
                                 Key.DirectionRight -> {
 
                             if (
-                                column <
-                                columns - 1 &&
-                                selectedLocalIndex + 1 <
-                                pageItemCount
+                                column < columns - 1 &&
+                                selectedLocalIndex + 1 < pageItemCountForKeys
                             ) {
 
                                 selectedLocalIndex++
@@ -397,8 +477,7 @@ fun PagedGrid(
 
 
                             if (
-                                nextIndex <
-                                pageItemCount
+                                nextIndex < pageItemCountForKeys
                             ) {
 
                                 selectedLocalIndex =
@@ -436,11 +515,11 @@ fun PagedGrid(
                         ) -> {
 
                             if (
-                                pageItemCount > 0
+                                pageItemCountForKeys > 0
                             ) {
 
                                 onOpenIndex(
-                                    firstIndex +
+                                    pageIndex * pageSize +
                                             selectedLocalIndex
                                 )
                             }
@@ -456,85 +535,144 @@ fun PagedGrid(
             .focusable()
     ) {
 
-        Column(
+        // ----------------------------------------------------
+        // GRILLE DE LA PAGE, avec transition glissante smooth
+        // au changement de pageIndex (swipe ou clavier)
+        // ----------------------------------------------------
+
+        AnimatedContent(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
-                .padding(
-                    horizontal = 5.dp,
-                    vertical = 3.dp
-                ),
+                .weight(1f),
 
-            verticalArrangement =
-                Arrangement.SpaceEvenly
-        ) {
+            targetState = pageIndex,
 
-            for (
-            row in 0 until rows
+            transitionSpec = {
+
+                if (targetState > initialState) {
+
+                    // page suivante : nouvelle page entre par la droite,
+                    // ancienne sort par la gauche
+                    (
+                            slideInHorizontally(
+                                animationSpec = tween(280)
+                            ) { fullWidth -> fullWidth } + fadeIn(tween(280))
+                            ) togetherWith (
+                            slideOutHorizontally(
+                                animationSpec = tween(280)
+                            ) { fullWidth -> -fullWidth } + fadeOut(tween(200))
+                            )
+
+                } else {
+
+                    // page précédente : nouvelle page entre par la gauche,
+                    // ancienne sort par la droite
+                    (
+                            slideInHorizontally(
+                                animationSpec = tween(280)
+                            ) { fullWidth -> -fullWidth } + fadeIn(tween(280))
+                            ) togetherWith (
+                            slideOutHorizontally(
+                                animationSpec = tween(280)
+                            ) { fullWidth -> fullWidth } + fadeOut(tween(200))
+                            )
+                }
+            },
+
+            label = "page_transition"
+
+        ) { animatedPageIndex ->
+
+            val firstIndex =
+                animatedPageIndex * pageSize
+
+
+            val pageItemCount =
+                minOf(
+                    pageSize,
+                    itemCount - firstIndex
+                ).coerceAtLeast(0)
+
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        horizontal = 5.dp,
+                        vertical = 3.dp
+                    ),
+
+                verticalArrangement =
+                    Arrangement.SpaceEvenly
             ) {
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-
-                    horizontalArrangement =
-                        Arrangement.spacedBy(5.dp)
+                for (
+                row in 0 until rows
                 ) {
 
-                    for (
-                    column in 0 until columns
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+
+                        horizontalArrangement =
+                            Arrangement.spacedBy(5.dp)
                     ) {
 
-                        val localIndex =
-                            row * columns +
-                                    column
-
-
-                        val globalIndex =
-                            firstIndex +
-                                    localIndex
-
-
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(),
-
-                            contentAlignment =
-                                Alignment.Center
+                        for (
+                        column in 0 until columns
                         ) {
 
-                            if (
-                                localIndex <
-                                pageItemCount
+                            val localIndex =
+                                row * columns +
+                                        column
+
+
+                            val globalIndex =
+                                firstIndex +
+                                        localIndex
+
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+
+                                contentAlignment =
+                                    Alignment.Center
                             ) {
 
-                                itemContent(
-                                    globalIndex,
+                                if (
+                                    localIndex < pageItemCount
+                                ) {
 
-                                    !backSelected &&
-                                            localIndex ==
-                                            selectedLocalIndex,
+                                    itemContent(
+                                        globalIndex,
 
-                                    {
-                                        selectedLocalIndex =
-                                            localIndex
+                                        animatedPageIndex == pageIndex &&
+                                                !backSelected &&
+                                                localIndex ==
+                                                selectedLocalIndex,
 
-                                        backSelected = false
-                                    },
+                                        {
+                                            selectedLocalIndex =
+                                                localIndex
 
-                                    {
-                                        selectedLocalIndex =
-                                            localIndex
+                                            backSelected = false
+                                        },
 
-                                        backSelected = false
+                                        {
+                                            selectedLocalIndex =
+                                                localIndex
 
-                                        onOpenIndex(
-                                            globalIndex
-                                        )
-                                    }
-                                )
+                                            backSelected = false
+
+                                            onOpenIndex(
+                                                globalIndex
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -543,50 +681,53 @@ fun PagedGrid(
         }
 
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(47.dp)
-                .padding(
-                    start = 8.dp,
-                    end = 7.dp,
-                    bottom = 4.dp
-                ),
+        if (showPageIndicator) {
 
-            verticalAlignment =
-                Alignment.CenterVertically
-        ) {
-
-            Text(
-                text =
-                    "${pageIndex + 1} / $pageCount",
-
-                color =
-                    Color.White.copy(
-                        alpha = 0.80f
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(47.dp)
+                    .padding(
+                        start = 8.dp,
+                        end = 7.dp,
+                        bottom = 4.dp
                     ),
 
-                fontFamily = GameFont,
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
 
-                fontSize = 10.sp,
+                Text(
+                    text =
+                        "${pageIndex + 1} / $pageCount",
 
-                fontWeight =
-                    FontWeight.Black
-            )
+                    color =
+                        Color.White.copy(
+                            alpha = 0.80f
+                        ),
 
+                    fontFamily = GameFont,
 
-            Spacer(
-                Modifier.weight(1f)
-            )
+                    fontSize = 10.sp,
 
-
-            if (showBack) {
-
-                BackButton(
-                    selected = backSelected,
-
-                    onClick = onBack
+                    fontWeight =
+                        FontWeight.Black
                 )
+
+
+                Spacer(
+                    Modifier.weight(1f)
+                )
+
+
+                if (showBack) {
+
+                    BackButton(
+                        selected = backSelected,
+
+                        onClick = onBack
+                    )
+                }
             }
         }
     }
@@ -596,10 +737,15 @@ fun PagedGrid(
 @Composable
 fun IconGroupItem(
     group: IconGroup,
+    continentColor: Color,
     selected: Boolean,
     onTap: () -> Unit,
     onLongPress: () -> Unit
 ) {
+
+    val isDiscovered =
+        group.discoveredCount > 0
+
 
     Column(
         modifier = Modifier
@@ -607,12 +753,15 @@ fun IconGroupItem(
             .fillMaxHeight()
             .pointerInput(group.uuid) {
 
+                // Sur cet écran (liste des groupes d'un continent), un
+                // simple tap sélectionne/surligne, et il faut un DOUBLE
+                // tap pour ouvrir le groupe (remplace l'ancien appui long).
                 detectTapGestures(
                     onTap = {
                         onTap()
                     },
 
-                    onLongPress = {
+                    onDoubleTap = {
                         onLongPress()
                     }
                 )
@@ -626,43 +775,23 @@ fun IconGroupItem(
             Arrangement.Center
     ) {
 
-        Text(
-            text =
-                "${group.discoveredCount} / ${group.totalCount}",
-
-            color = Color.White,
-
-            fontFamily = GameFont,
-
-            fontSize = 11.sp,
-
-            fontWeight =
-                FontWeight.Black
-        )
-
-
-        Spacer(
-            Modifier.height(2.dp)
-        )
-
-
         Box(
             modifier = Modifier
                 .size(
                     if (selected) {
-                        82.dp
+                        140.dp
                     } else {
-                        75.dp
+                        150.dp
                     }
                 )
                 .background(
                     color =
-                        if (selected) {
-                            Color.White
+                        if (isDiscovered) {
+                            // capturé : teinte du continent (ex. orange pour Afrique)
+                            continentColor
                         } else {
-                            Color.White.copy(
-                                alpha = 0.15f
-                            )
+                            // non capturé : gris foncé, comme la référence Pokédex
+                            UndiscoveredCardColor
                         },
 
                     shape =
@@ -670,58 +799,87 @@ fun IconGroupItem(
                             11.dp
                         )
                 )
-                .padding(3.dp),
+                .then(
+                    if (selected) {
+                        Modifier.background(
+                            Color.White.copy(alpha = 0.25f),
+                            RoundedCornerShape(11.dp)
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
+                .padding(6.dp),
 
             contentAlignment =
                 Alignment.Center
         ) {
 
+            // Icône de l'animal, centrée et rétrécie (ne remplit plus toute la case)
             AsyncImage(
                 model = group.imagePath,
 
                 contentDescription =
                     group.displayName,
 
-                modifier =
-                    Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxSize(0.55f),
 
                 contentScale =
                     ContentScale.Fit
             )
+
+            // Compteur 0/x dans le coin en haut à droite, lettres resserrées
+            Text(
+                text =
+                    "${group.discoveredCount}/${group.totalCount}",
+
+                color = Color.White,
+
+                fontFamily = GameFont,
+
+                fontSize = 10.sp,
+
+                letterSpacing = (-0.5).sp,
+
+                fontWeight = FontWeight.Black,
+
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(3.dp)
+            )
+
+            // Nom de l'animal en bas de la case
+            Text(
+                text =
+                    group.displayName.uppercase(),
+
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(2.dp),
+
+                color = Color.White,
+
+                fontFamily = GameFont,
+
+                fontSize = 10.sp,
+
+                fontWeight =
+                    FontWeight.Black,
+
+                maxLines = 2,
+
+                lineHeight = 10.sp,
+
+                overflow =
+                    TextOverflow.Ellipsis,
+
+                textAlign =
+                    TextAlign.Center
+            )
         }
-
-
-        Spacer(
-            Modifier.height(3.dp)
-        )
-
-
-        Text(
-            text =
-                group.displayName.uppercase(),
-
-            modifier =
-                Modifier.fillMaxWidth(),
-
-            color = Color.White,
-
-            fontFamily = GameFont,
-
-            fontSize = 10.sp,
-
-            fontWeight =
-                FontWeight.Black,
-
-            maxLines = 2,
-
-            lineHeight = 10.sp,
-
-            overflow =
-                TextOverflow.Ellipsis,
-
-            textAlign =
-                TextAlign.Center
-        )
     }
 }
 
@@ -729,6 +887,7 @@ fun IconGroupItem(
 @Composable
 fun AnimalGridItem(
     animal: Animal,
+    continentColor: Color,
     selected: Boolean,
     onTap: () -> Unit,
     onLongPress: () -> Unit
@@ -740,12 +899,10 @@ fun AnimalGridItem(
             .fillMaxHeight()
             .pointerInput(animal.id) {
 
+                // Sur cet écran (liste des animaux d'un groupe), un simple
+                // tap suffit pour ouvrir directement la fiche de l'animal.
                 detectTapGestures(
                     onTap = {
-                        onTap()
-                    },
-
-                    onLongPress = {
                         onLongPress()
                     }
                 )
@@ -763,19 +920,19 @@ fun AnimalGridItem(
             modifier = Modifier
                 .size(
                     if (selected) {
-                        82.dp
+                        140.dp
                     } else {
-                        75.dp
+                        150.dp
                     }
                 )
                 .background(
                     color =
-                        if (selected) {
-                            Color.White
+                        if (animal.discovered) {
+                            // capturé : teinte du continent, comme les groupes
+                            continentColor
                         } else {
-                            Color.White.copy(
-                                alpha = 0.15f
-                            )
+                            // non capturé : gris foncé, comme les groupes
+                            UndiscoveredCardColor
                         },
 
                     shape =
@@ -783,12 +940,23 @@ fun AnimalGridItem(
                             11.dp
                         )
                 )
-                .padding(3.dp),
+                .then(
+                    if (selected) {
+                        Modifier.background(
+                            Color.White.copy(alpha = 0.25f),
+                            RoundedCornerShape(11.dp)
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
+                .padding(6.dp),
 
             contentAlignment =
                 Alignment.Center
         ) {
 
+            // Icône de l'animal, centrée et rétrécie, comme pour les groupes
             if (
                 animal.localImagePath
                     .isNullOrBlank()
@@ -797,9 +965,14 @@ fun AnimalGridItem(
                 Text(
                     text = "?",
 
-                    color = Color.Black,
+                    color = Color.White,
 
-                    fontSize = 35.sp
+                    fontFamily = GameFont,
+
+                    fontSize = 35.sp,
+
+                    fontWeight =
+                        FontWeight.Black
                 )
 
             } else {
@@ -811,47 +984,206 @@ fun AnimalGridItem(
                     contentDescription =
                         animal.displayName,
 
-                    modifier =
-                        Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxSize(0.55f),
 
                     contentScale =
                         ContentScale.Fit
                 )
             }
+
+            // Coche en haut à droite si l'animal est déjà découvert
+            if (animal.discovered) {
+
+                Text(
+                    text = "✓",
+
+                    color = Color.White,
+
+                    fontFamily = GameFont,
+
+                    fontSize = 10.sp,
+
+                    fontWeight = FontWeight.Black,
+
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(3.dp)
+                )
+            }
+
+            // Nom de l'animal en bas de la case, comme pour les groupes
+            Text(
+                text =
+                    animal.displayName.uppercase(),
+
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(2.dp),
+
+                color = Color.White,
+
+                fontFamily = GameFont,
+
+                fontSize = 10.sp,
+
+                fontWeight =
+                    FontWeight.Black,
+
+                maxLines = 2,
+
+                lineHeight = 10.sp,
+
+                overflow =
+                    TextOverflow.Ellipsis,
+
+                textAlign =
+                    TextAlign.Center
+            )
         }
+    }
+}
 
 
-        Spacer(
-            Modifier.height(3.dp)
-        )
+@Composable
+fun ContinentGridItem(
+    entry: ContinentGridEntry,
+    selected: Boolean,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit
+) {
+
+    val continent =
+        entry.continent
 
 
-        Text(
-            text =
-                animal.displayName.uppercase(),
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .pointerInput(continent.name) {
 
-            modifier =
-                Modifier.fillMaxWidth(),
+                // Sur l'écran d'accueil, un simple tap suffit pour ouvrir
+                // directement les groupes du continent.
+                detectTapGestures(
+                    onTap = {
+                        onLongPress()
+                    }
+                )
+            }
+            .padding(2.dp),
 
-            color = Color.White,
+        horizontalAlignment =
+            Alignment.CenterHorizontally,
 
-            fontFamily = GameFont,
+        verticalArrangement =
+            Arrangement.Center
+    ) {
 
-            fontSize = 10.sp,
+        Box(
+            modifier = Modifier
+                .size(
+                    if (selected) {
+                        140.dp
+                    } else {
+                        150.dp
+                    }
+                )
+                .background(
+                    // Toujours la couleur du continent, contrairement aux
+                    // groupes qui grisent les cases non découvertes.
+                    color = continent.normalColor,
 
-            fontWeight =
-                FontWeight.Black,
+                    shape =
+                        RoundedCornerShape(
+                            11.dp
+                        )
+                )
+                .then(
+                    if (selected) {
+                        Modifier.background(
+                            Color.White.copy(alpha = 0.25f),
+                            RoundedCornerShape(11.dp)
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
+                .padding(6.dp),
 
-            maxLines = 2,
+            contentAlignment =
+                Alignment.Center
+        ) {
 
-            lineHeight = 10.sp,
+            // Image du continent, centrée et rétrécie. Fichier à ajouter
+            // dans app/src/main/assets/continents/ (voir
+            // ContinentData.imagePath pour la convention de nommage).
+            AsyncImage(
+                model = continent.imagePath,
 
-            overflow =
-                TextOverflow.Ellipsis,
+                contentDescription =
+                    continent.name,
 
-            textAlign =
-                TextAlign.Center
-        )
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxSize(0.55f),
+
+                contentScale =
+                    ContentScale.Fit
+            )
+
+            // Compteur d'animaux découverts sur ce continent
+            Text(
+                text =
+                    "${entry.discoveredCount}/${entry.totalCount}",
+
+                color = Color.White,
+
+                fontFamily = GameFont,
+
+                fontSize = 10.sp,
+
+                letterSpacing = (-0.5).sp,
+
+                fontWeight = FontWeight.Black,
+
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(3.dp)
+            )
+
+            // Nom du continent en bas de la case
+            Text(
+                text =
+                    continent.name.uppercase(),
+
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(2.dp),
+
+                color = Color.White,
+
+                fontFamily = GameFont,
+
+                fontSize = 10.sp,
+
+                fontWeight =
+                    FontWeight.Black,
+
+                maxLines = 2,
+
+                lineHeight = 10.sp,
+
+                overflow =
+                    TextOverflow.Ellipsis,
+
+                textAlign =
+                    TextAlign.Center
+            )
+        }
     }
 }
 
@@ -893,7 +1225,7 @@ fun BackButton(
     ) {
 
         Text(
-            text = "← BACK",
+            text = "←",
 
             color =
                 if (selected) {

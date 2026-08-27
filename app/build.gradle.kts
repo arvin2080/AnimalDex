@@ -51,6 +51,9 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
+    // SceneView (rendu 3D, moteur Filament) — uniquement le module 3D,
+    // pas besoin du module AR (arsceneview) pour ce qu'on fait ici.
+    implementation("io.github.sceneview:sceneview:4.32.0")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

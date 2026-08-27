@@ -489,68 +489,64 @@ private val DefaultSilhouette: List<Offset> =
 private val ContinentSilhouettes: Map<String, List<Offset>> =
     mapOf(
 
-        "AFRICA" to listOf(
-            Offset(-0.60f, -0.95f), Offset(0.15f, -1.00f), Offset(0.55f, -0.85f),
-            Offset(1.05f, -0.45f), Offset(0.60f, -0.05f), Offset(0.70f, 0.30f),
-            Offset(0.35f, 0.65f), Offset(0.05f, 1.00f), Offset(-0.25f, 0.65f),
-            Offset(-0.40f, 0.30f), Offset(-0.20f, -0.05f), Offset(-0.65f, -0.15f),
-            Offset(-0.80f, -0.50f)
-        ),
-
-        "ANTARCTICA" to listOf(
-            Offset(0.00f, -1.00f), Offset(0.55f, -0.85f), Offset(0.90f, -0.45f),
-            Offset(0.60f, -0.10f), Offset(0.85f, 0.30f), Offset(0.55f, 0.75f),
-            Offset(0.10f, 0.95f), Offset(-0.35f, 0.80f), Offset(-0.20f, 0.40f),
-            Offset(-0.60f, 0.55f), Offset(-0.90f, 0.20f), Offset(-0.80f, -0.15f),
-            Offset(-1.15f, -0.45f), Offset(-0.90f, -0.60f), Offset(-0.55f, -0.75f)
-        ),
-
-        "ASIA" to listOf(
-            Offset(-1.10f, -0.85f), Offset(-0.55f, -1.05f), Offset(0.15f, -1.10f),
-            Offset(0.65f, -0.95f), Offset(1.05f, -0.60f), Offset(0.80f, -0.20f),
-            Offset(1.00f, 0.15f), Offset(0.60f, 0.30f), Offset(0.70f, 0.55f),
-            Offset(0.35f, 0.55f), Offset(0.45f, 0.90f), Offset(0.15f, 0.75f),
-            Offset(0.10f, 1.05f), Offset(-0.20f, 0.70f), Offset(-0.45f, 0.60f),
-            Offset(-0.55f, 0.35f), Offset(-0.90f, 0.40f), Offset(-1.00f, 0.00f),
-            Offset(-0.85f, -0.40f)
-        ),
-
         "NORTH AMERICA" to listOf(
-            Offset(-1.05f, -0.65f), Offset(-0.65f, -1.00f), Offset(0.05f, -1.10f),
-            Offset(0.55f, -0.90f), Offset(0.80f, -0.55f), Offset(0.45f, -0.35f),
-            Offset(0.75f, -0.10f), Offset(0.55f, 0.20f), Offset(0.80f, 0.35f),
-            Offset(0.50f, 0.15f), Offset(0.30f, 0.10f), Offset(0.10f, 0.55f),
-            Offset(0.05f, 0.90f), Offset(0.15f, 1.15f), Offset(-0.10f, 0.85f),
-            Offset(-0.25f, 0.50f), Offset(-0.15f, 0.05f), Offset(-0.65f, 0.05f),
-            Offset(-0.95f, -0.30f)
+            Offset(-0.37f, -0.12f), Offset(-0.213f, -0.294f), Offset(0.0f, -0.58f),
+            Offset(0.302f, -0.416f), Offset(0.451f, -0.146f), Offset(0.362f, 0.118f),
+            Offset(0.174f, 0.239f), Offset(0.0f, 0.408f), Offset(-0.32f, 0.441f),
+            Offset(-0.951f, 0.309f)
         ),
 
         "SOUTH AMERICA" to listOf(
-            Offset(-0.20f, -1.05f), Offset(0.20f, -0.85f), Offset(0.55f, -0.55f),
-            Offset(0.85f, -0.10f), Offset(0.65f, 0.25f), Offset(0.50f, 0.60f),
-            Offset(0.25f, 0.90f), Offset(0.05f, 1.15f), Offset(-0.15f, 0.85f),
-            Offset(-0.30f, 0.45f), Offset(-0.40f, 0.05f), Offset(-0.45f, -0.40f),
-            Offset(-0.40f, -0.75f)
+            Offset(-0.523f, -0.119f), Offset(-0.376f, -0.3f), Offset(-0.199f, -0.413f),
+            Offset(0.0f, -0.543f), Offset(0.21f, -0.437f), Offset(0.278f, -0.222f),
+            Offset(0.451f, -0.103f), Offset(0.961f, 0.219f), Offset(0.782f, 0.623f),
+            Offset(0.214f, 0.445f), Offset(0.0f, 0.316f), Offset(-0.182f, 0.379f),
+            Offset(-0.36f, 0.287f), Offset(-0.846f, 0.193f)
         ),
 
         "EUROPE" to listOf(
-            Offset(0.05f, -1.10f), Offset(0.50f, -0.95f), Offset(0.85f, -0.70f),
-            Offset(0.70f, -0.35f), Offset(0.95f, -0.10f), Offset(0.75f, 0.20f),
-            Offset(0.75f, 0.45f), Offset(0.50f, 0.55f), Offset(0.35f, 0.95f),
-            Offset(0.15f, 0.75f), Offset(-0.10f, 0.60f), Offset(-0.25f, 0.55f),
-            Offset(-0.55f, 0.65f), Offset(-0.70f, 0.35f), Offset(-0.85f, -0.05f),
-            Offset(-0.55f, -0.35f), Offset(-0.60f, -0.75f), Offset(-0.20f, -0.95f)
+            Offset(-0.449f, -0.12f), Offset(-0.373f, -0.373f), Offset(-0.157f, -0.587f),
+            Offset(0.248f, -0.926f), Offset(0.707f, -0.707f), Offset(0.904f, -0.242f),
+            Offset(0.401f, 0.108f), Offset(0.322f, 0.322f), Offset(0.21f, 0.782f),
+            Offset(-0.214f, 0.797f), Offset(-0.579f, 0.579f), Offset(-0.583f, 0.156f)
+        ),
+
+        "AFRICA" to listOf(
+            Offset(-0.772f, -0.154f), Offset(-0.582f, -0.389f), Offset(-0.402f, -0.602f),
+            Offset(-0.139f, -0.7f), Offset(0.137f, -0.689f), Offset(0.335f, -0.502f),
+            Offset(0.64f, -0.428f), Offset(0.981f, -0.195f), Offset(0.976f, 0.194f),
+            Offset(0.714f, 0.477f), Offset(0.356f, 0.533f), Offset(0.119f, 0.596f),
+            Offset(-0.113f, 0.568f), Offset(-0.387f, 0.579f), Offset(-0.727f, 0.486f),
+            Offset(-0.922f, 0.183f)
+        ),
+
+        "ASIA" to listOf(
+            Offset(-0.77f, -0.136f), Offset(-0.661f, -0.382f), Offset(-0.448f, -0.533f),
+            Offset(-0.34f, -0.934f), Offset(0.0f, -0.933f), Offset(0.322f, -0.885f),
+            Offset(0.643f, -0.766f), Offset(0.794f, -0.459f), Offset(0.825f, -0.146f),
+            Offset(0.715f, 0.126f), Offset(0.847f, 0.489f), Offset(0.54f, 0.644f),
+            Offset(0.304f, 0.836f), Offset(0.0f, 0.987f), Offset(-0.339f, 0.931f),
+            Offset(-0.637f, 0.759f), Offset(-0.805f, 0.465f), Offset(-0.84f, 0.148f)
         ),
 
         "OCEANIA" to listOf(
-            Offset(-0.75f, -0.35f), Offset(-0.30f, -0.65f), Offset(0.20f, -0.70f),
-            Offset(0.55f, -0.50f), Offset(0.35f, -0.20f), Offset(0.80f, 0.10f),
-            Offset(0.60f, 0.45f), Offset(0.15f, 0.35f), Offset(-0.35f, 0.50f),
-            Offset(-0.75f, 0.15f)
+            Offset(-0.573f, -0.153f), Offset(-0.368f, -0.368f), Offset(-0.139f, -0.518f),
+            Offset(0.169f, -0.632f), Offset(0.665f, -0.665f), Offset(0.703f, -0.188f),
+            Offset(0.966f, 0.259f), Offset(0.659f, 0.659f), Offset(0.147f, 0.55f),
+            Offset(-0.116f, 0.432f), Offset(-0.343f, 0.343f), Offset(-0.586f, 0.157f)
+        ),
+
+        "ANTARCTICA" to listOf(
+            Offset(-0.851f, -0.194f), Offset(-0.661f, -0.527f), Offset(-0.23f, -0.479f),
+            Offset(0.0f, -0.421f), Offset(0.168f, -0.349f), Offset(0.444f, -0.354f),
+            Offset(0.915f, -0.209f), Offset(0.975f, 0.223f), Offset(0.594f, 0.474f),
+            Offset(0.268f, 0.556f), Offset(0.0f, 0.885f), Offset(-0.416f, 0.863f),
+            Offset(-0.721f, 0.575f), Offset(-0.818f, 0.187f)
         ),
 
         "UNKNOWN" to DefaultSilhouette
     )
+
 
 
 private val ContinentSizeMultiplier: Map<String, Float> =
@@ -640,12 +636,25 @@ private fun buildContinentBodyVertices(
 // CONTINENT SPHERE (modèle 3D réel, rotation au doigt)
 // ============================================================
 
+
 private const val SphereScreenRadiusFraction = 0.25f
 private const val ContinentHitRadiusFraction = 0.30f
 private const val SphereRotationSensitivityDegrees = 0.35f
 
 private const val EarthScale = 0.5f
 private const val EarthDistance = 10f
+
+// Rotation de fond, toujours active, très lente (≈ un tour complet
+// toutes les ~3 minutes à 60 fps).
+private const val IdleRotationDegreesPerFrame = -0.20f
+
+// Facteur de décélération de l'inertie, appliqué chaque frame après
+// un lâcher (plus proche de 1 = ralentit plus lentement).
+private const val FlingDecayFactor = 0.90f
+
+// En dessous de ce seuil (degrés/frame), l'inertie est considérée
+// comme arrêtée.
+private const val FlingStopThreshold = 0.01f
 
 
 @Composable
@@ -684,8 +693,52 @@ private fun ContinentSphere(
 
 
     var rotationXDegrees by remember { mutableFloatStateOf(10f) }
-    var rotationYDegrees by remember { mutableFloatStateOf(30f) }
+    var rotationYDegrees by remember { mutableFloatStateOf(200f) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
+
+    // Vitesse d'inertie courante (degrés/frame), décroît vers 0
+    // après un lâcher. Dernier delta de glissement brut, utilisé
+    // pour amorcer l'inertie au moment du relâchement.
+    var flingVelocityX by remember { mutableFloatStateOf(0f) }
+    var flingVelocityY by remember { mutableFloatStateOf(0f) }
+    var lastDragDeltaX by remember { mutableFloatStateOf(0f) }
+    var lastDragDeltaY by remember { mutableFloatStateOf(0f) }
+
+
+    // Boucle continue : rotation de fond + décélération de l'inertie.
+    LaunchedEffect(Unit) {
+
+        while (true) {
+
+            withFrameMillis {}
+
+            rotationYDegrees += IdleRotationDegreesPerFrame
+
+            if (
+                abs(flingVelocityX) > FlingStopThreshold ||
+                abs(flingVelocityY) > FlingStopThreshold
+            ) {
+
+                rotationYDegrees +=
+                    -flingVelocityX * SphereRotationSensitivityDegrees
+
+                val newRotationX =
+                    rotationXDegrees +
+                            (flingVelocityY * SphereRotationSensitivityDegrees)
+
+                rotationXDegrees =
+                    newRotationX.coerceIn(-75f, 75f)
+
+                flingVelocityX *= FlingDecayFactor
+                flingVelocityY *= FlingDecayFactor
+
+            } else {
+
+                flingVelocityX = 0f
+                flingVelocityY = 0f
+            }
+        }
+    }
 
 
     val azimuthRad = rotationYDegrees * (PI.toFloat() / 180f)
@@ -789,6 +842,13 @@ private fun ContinentSphere(
                 .pointerInput(Unit) {
 
                     detectDragGestures(
+                        onDragStart = {
+
+                            // Attraper le globe stoppe l'inertie en cours.
+                            flingVelocityX = 0f
+                            flingVelocityY = 0f
+                        },
+
                         onDrag = { change, dragAmount ->
 
                             rotationYDegrees +=
@@ -805,7 +865,18 @@ private fun ContinentSphere(
                             rotationXDegrees =
                                 newRotationX.coerceIn(-75f, 75f)
 
+                            lastDragDeltaX = dragAmount.x
+                            lastDragDeltaY = dragAmount.y
+
                             change.consume()
+                        },
+
+                        onDragEnd = {
+
+                            // Amorce l'inertie avec la vitesse du dernier
+                            // mouvement enregistré.
+                            flingVelocityX = lastDragDeltaX
+                            flingVelocityY = lastDragDeltaY
                         }
                     )
                 }

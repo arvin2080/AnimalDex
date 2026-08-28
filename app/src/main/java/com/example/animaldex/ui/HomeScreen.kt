@@ -1,10 +1,16 @@
 package com.example.animaldex.ui
 
+import android.content.Context
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.material3.Text
@@ -17,6 +23,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
@@ -28,6 +35,8 @@ import kotlin.math.*
 import io.github.sceneview.*
 import io.github.sceneview.node.*
 import io.github.sceneview.math.*
+
+import coil3.compose.AsyncImage
 
 import com.example.animaldex.model.Animal
 import com.example.animaldex.model.ContinentData
@@ -58,6 +67,121 @@ data class ContinentGridEntry(
 
 
 // ============================================================
+// SKINS DE PLANÈTE
+// ============================================================
+//
+// Un seul skin pour l'instant (le modèle actuel). Ajouter un skin
+// plus tard = ajouter une entrée ici, rien d'autre à changer.
+
+data class PlanetSkin(
+    val id: String,
+    val displayName: String,
+    val modelAssetPath: String,
+    val previewImagePath: String
+)
+
+
+private val AvailablePlanetSkins: List<PlanetSkin> =
+    listOf(
+
+        PlanetSkin(
+            id = "planet_earth",
+            displayName = "Terre",
+            modelAssetPath = "models/earth/planet_earth.glb",
+            previewImagePath = "file:///android_asset/models/earth/images/terre1.png"
+        ),
+
+        PlanetSkin(
+            id = "mon_nouveau_skin",
+            displayName = "NOM AFFICHÉ",
+            modelAssetPath = "models/earth/mon_fichier.glb",
+            previewImagePath = "file:///android_asset/models/earth/mon_apercu.png"
+        )
+
+        // Prochains skins : ajouter une entrée PlanetSkin ici.
+    )
+
+
+// ============================================================
+// PERSISTANCE (skin choisi + taille de la planète)
+// ============================================================
+
+private const val SettingsPrefsName = "animaldex_settings"
+private const val PrefKeySelectedSkinId = "selected_skin_id"
+private const val PrefKeyPlanetScale = "planet_scale"
+
+private const val DefaultPlanetScale = 0.5f
+private const val MinPlanetScale = 0.1f
+private const val MaxPlanetScale = 0.9f
+
+
+private fun loadSelectedSkinId(
+    context: Context
+): String {
+
+    val prefs =
+        context.getSharedPreferences(
+            SettingsPrefsName,
+            Context.MODE_PRIVATE
+        )
+
+    val fallback = AvailablePlanetSkins.first().id
+
+    return prefs.getString(
+        PrefKeySelectedSkinId,
+        fallback
+    ) ?: fallback
+}
+
+
+private fun saveSelectedSkinId(
+    context: Context,
+    id: String
+) {
+
+    context.getSharedPreferences(
+        SettingsPrefsName,
+        Context.MODE_PRIVATE
+    )
+        .edit()
+        .putString(PrefKeySelectedSkinId, id)
+        .apply()
+}
+
+
+private fun loadPlanetScale(
+    context: Context
+): Float {
+
+    val prefs =
+        context.getSharedPreferences(
+            SettingsPrefsName,
+            Context.MODE_PRIVATE
+        )
+
+    return prefs.getFloat(
+        PrefKeyPlanetScale,
+        DefaultPlanetScale
+    )
+}
+
+
+private fun savePlanetScale(
+    context: Context,
+    scale: Float
+) {
+
+    context.getSharedPreferences(
+        SettingsPrefsName,
+        Context.MODE_PRIVATE
+    )
+        .edit()
+        .putFloat(PrefKeyPlanetScale, scale)
+        .apply()
+}
+
+
+// ============================================================
 // HOME SCREEN
 // ============================================================
 
@@ -68,6 +192,8 @@ fun HomeScreen(
     onGlobalGroupSelected: (IconGroup) -> Unit,
     onCameraClick: () -> Unit
 ) {
+
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var search by remember {
         mutableStateOf("")
@@ -81,91 +207,651 @@ fun HomeScreen(
     }
 
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                PageBackgroundColor
-            )
+    // --------------------------------------------------------
+    // ÉTAT PERSISTANT : skin sélectionné + taille de la planète.
+    // Chargé une seule fois depuis SharedPreferences, sauvegardé à
+    // chaque changement.
+    // --------------------------------------------------------
+
+    var selectedSkinId by remember {
+        mutableStateOf(
+            loadSelectedSkinId(context)
+        )
+    }
+
+    var planetScale by remember {
+        mutableFloatStateOf(
+            loadPlanetScale(context)
+        )
+    }
+
+    val selectedSkin =
+        remember(selectedSkinId) {
+            AvailablePlanetSkins.firstOrNull {
+                it.id == selectedSkinId
+            } ?: AvailablePlanetSkins.first()
+        }
+
+
+    // --------------------------------------------------------
+    // ÉTAT DU MENU RÉGLAGES
+    // --------------------------------------------------------
+
+    var showSettingsMenu by remember {
+        mutableStateOf(false)
+    }
+
+    var showSkinsPanel by remember {
+        mutableStateOf(false)
+    }
+
+
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
 
-        SearchHeader(
-            leftText = "ANIMALDEX",
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    PageBackgroundColor
+                )
+        ) {
 
-            search = search,
+            SearchHeader(
+                leftText = "ANIMALDEX",
+                backIcon = "⚙",
 
-            onSearchChange = {
-                search = it
-            },
-
-            filterLabel =
-                filter.label,
-
-            filterOptions =
-                GroupFilter.entries.map {
-                    it.label
+                onBack = {
+                    showSettingsMenu = true
+                    showSkinsPanel = false
                 },
 
-            onFilterSelected = { index ->
+                search = search,
 
-                filter =
-                    GroupFilter.entries[index]
-            },
+                onSearchChange = {
+                    search = it
+                },
 
-            backgroundColor =
-                allAnimalsColor
-        )
+                filterLabel =
+                    filter.label,
 
+                filterOptions =
+                    GroupFilter.entries.map {
+                        it.label
+                    },
 
-        CameraMenuButton(
-            onClick =
-                onCameraClick
-        )
+                onFilterSelected = { index ->
 
+                    filter =
+                        GroupFilter.entries[index]
+                },
 
-        if (search.isBlank()) {
-
-            ContinentMenuBody(
-                animals = animals,
-
-                groupFilter =
-                    filter,
-
-                onContinentSelected =
-                    onContinentSelected
+                backgroundColor =
+                    allAnimalsColor
             )
 
-        } else {
-
-            val searchedAnimals =
-                animals.filter {
-
-                    animalMatchesSearch(
-                        it,
-                        search
-                    )
-                }
 
 
-            val groups =
-                applyGroupFilter(
-                    buildIconGroups(
-                        searchedAnimals
-                    ),
-                    filter
+            CameraMenuButton(
+                onClick =
+                    onCameraClick
+            )
+
+
+
+            if (search.isBlank()) {
+
+                ContinentMenuBody(
+                    animals = animals,
+
+                    groupFilter =
+                        filter,
+
+                    planetScale =
+                        planetScale,
+
+                    selectedSkin =
+                        selectedSkin,
+
+                    onContinentSelected =
+                        onContinentSelected
                 )
 
+            } else {
 
-            SearchGroupsBody(
-                groups = groups,
+                val searchedAnimals =
+                    animals.filter {
 
-                color =
-                    allAnimalsColor,
+                        animalMatchesSearch(
+                            it,
+                            search
+                        )
+                    }
 
-                onGroupSelected =
-                    onGlobalGroupSelected
+
+                val groups =
+                    applyGroupFilter(
+                        buildIconGroups(
+                            searchedAnimals
+                        ),
+                        filter
+                    )
+
+
+                SearchGroupsBody(
+                    groups = groups,
+
+                    color =
+                        allAnimalsColor,
+
+                    onGroupSelected =
+                        onGlobalGroupSelected
+                )
+
+            }
+        }
+
+        // ----------------------------------------------------
+        // MENU RÉGLAGES (voile + panneau)
+        // ----------------------------------------------------
+
+        if (showSettingsMenu) {
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Color.Black.copy(alpha = 0.55f)
+                    )
+                    .pointerInput(Unit) {
+
+                        detectTapGestures(
+                            onTap = {
+
+                                showSettingsMenu = false
+                                showSkinsPanel = false
+                            }
+                        )
+                    }
+            )
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 24.dp)
+                    .background(
+                        PageBackgroundColor,
+                        RoundedCornerShape(14.dp)
+                    )
+                    .pointerInput(Unit) {
+
+                        // Absorbe les taps pour ne pas fermer le
+                        // menu quand on touche à l'intérieur.
+                        detectTapGestures(
+                            onTap = {}
+                        )
+                    }
+                    .padding(16.dp)
+            ) {
+
+                if (!showSkinsPanel) {
+
+                    SettingsMainPanel(
+                        onSkinsClick = {
+                            showSkinsPanel = true
+                        }
+                    )
+
+                } else {
+
+                    SkinsPanel(
+                        skins = AvailablePlanetSkins,
+
+                        selectedSkinId = selectedSkinId,
+
+                        planetScale = planetScale,
+
+                        onBack = {
+                            showSkinsPanel = false
+                        },
+
+                        onSkinSelected = { skin ->
+
+                            selectedSkinId = skin.id
+
+                            saveSelectedSkinId(
+                                context,
+                                skin.id
+                            )
+                        },
+
+                        onScaleChange = { newScale ->
+
+                            planetScale = newScale
+
+                            savePlanetScale(
+                                context,
+                                newScale
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+// ============================================================
+// PANNEAU RÉGLAGES PRINCIPAL (6 boutons, 2 colonnes)
+// ============================================================
+
+@Composable
+private fun SettingsMainPanel(
+    onSkinsClick: () -> Unit
+) {
+
+    Column(
+        horizontalAlignment =
+            Alignment.CenterHorizontally
+    ) {
+
+        Text(
+            text = "RÉGLAGES",
+
+            color = Color.White,
+
+            fontFamily = GameFont,
+
+            fontSize = 13.sp,
+
+            fontWeight = FontWeight.Black
+        )
+
+
+        Spacer(
+            modifier = Modifier.height(14.dp)
+        )
+
+
+        val labels =
+            listOf(
+                "SKINS", "BIENTÔT",
+                "BIENTÔT", "BIENTÔT",
+                "BIENTÔT", "BIENTÔT"
+            )
+
+        for (row in 0 until 3) {
+
+            Row(
+                horizontalArrangement =
+                    Arrangement.spacedBy(10.dp)
+            ) {
+
+                for (col in 0 until 2) {
+
+                    val index = row * 2 + col
+                    val label = labels[index]
+                    val isEnabled = (label == "SKINS")
+
+                    Box(
+                        modifier = Modifier
+                            .size(
+                                width = 110.dp,
+                                height = 48.dp
+                            )
+                            .background(
+                                Color.White.copy(
+                                    alpha = if (isEnabled) 0.20f else 0.08f
+                                ),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .pointerInput(isEnabled) {
+
+                                detectTapGestures(
+                                    onTap = {
+
+                                        if (isEnabled) {
+                                            onSkinsClick()
+                                        }
+                                    }
+                                )
+                            },
+
+                        contentAlignment =
+                            Alignment.Center
+                    ) {
+
+                        Text(
+                            text = label,
+
+                            color =
+                                Color.White.copy(
+                                    alpha = if (isEnabled) 1f else 0.45f
+                                ),
+
+                            fontFamily = GameFont,
+
+                            fontSize = 10.sp,
+
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+            }
+
+
+            if (row < 2) {
+
+                Spacer(
+                    modifier = Modifier.height(10.dp)
+                )
+            }
+        }
+    }
+}
+
+
+// ============================================================
+// PANNEAU SKINS (taille de la planète + liste des skins)
+// ============================================================
+
+@Composable
+private fun SkinsPanel(
+    skins: List<PlanetSkin>,
+    selectedSkinId: String,
+    planetScale: Float,
+    onBack: () -> Unit,
+    onSkinSelected: (PlanetSkin) -> Unit,
+    onScaleChange: (Float) -> Unit
+) {
+
+    Column {
+
+        Row(
+            verticalAlignment =
+                Alignment.CenterVertically,
+
+            modifier = Modifier
+                .pointerInput(Unit) {
+
+                    detectTapGestures(
+                        onTap = {
+                            onBack()
+                        }
+                    )
+                }
+        ) {
+
+            Text(
+                text = "←",
+
+                color = Color.White,
+
+                fontFamily = GameFont,
+
+                fontSize = 14.sp,
+
+                lineHeight = 14.sp,
+
+                fontWeight = FontWeight.Black
+            )
+
+
+            Spacer(
+                modifier = Modifier.width(8.dp)
+            )
+
+
+            Text(
+                text = "SKINS",
+
+                color = Color.White,
+
+                fontFamily = GameFont,
+
+                fontSize = 13.sp,
+
+                fontWeight = FontWeight.Black
             )
         }
+
+
+        Spacer(
+            modifier = Modifier.height(14.dp)
+        )
+
+
+        Text(
+            text = "TAILLE DE LA PLANÈTE",
+
+            color =
+                Color.White.copy(alpha = 0.65f),
+
+            fontFamily = GameFont,
+
+            fontSize = 9.sp,
+
+            fontWeight = FontWeight.Black
+        )
+
+
+        Spacer(
+            modifier = Modifier.height(8.dp)
+        )
+
+
+        PlanetScaleSlider(
+            initialScale = planetScale,
+
+            minScale = MinPlanetScale,
+
+            maxScale = MaxPlanetScale,
+
+            onScaleChange =
+                onScaleChange
+        )
+
+
+        Spacer(
+            modifier = Modifier.height(18.dp)
+        )
+
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+
+            horizontalArrangement =
+                Arrangement.spacedBy(10.dp),
+
+            verticalArrangement =
+                Arrangement.spacedBy(10.dp),
+
+            modifier = Modifier
+                .height(160.dp)
+                .width(260.dp)
+        ) {
+
+            items(skins) { skin ->
+
+                val isSelected =
+                    skin.id == selectedSkinId
+
+                Column(
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally,
+
+                    modifier = Modifier
+                        .pointerInput(skin.id) {
+
+                            detectTapGestures(
+                                onTap = {
+                                    onSkinSelected(skin)
+                                }
+                            )
+                        }
+                ) {
+
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .background(
+                                Color.White.copy(alpha = 0.10f),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .then(
+                                if (isSelected) {
+                                    Modifier.background(
+                                        Color.White.copy(alpha = 0.25f),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                } else {
+                                    Modifier
+                                }
+                            )
+                            .padding(4.dp),
+
+                        contentAlignment =
+                            Alignment.Center
+                    ) {
+
+                        AsyncImage(
+                            model = skin.previewImagePath,
+
+                            contentDescription =
+                                skin.displayName,
+
+                            modifier =
+                                Modifier.fillMaxSize(),
+
+                            contentScale =
+                                ContentScale.Fit
+                        )
+                    }
+
+
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
+
+
+                    Text(
+                        text =
+                            skin.displayName.uppercase(),
+
+                        color =
+                            if (isSelected) {
+                                Color.White
+                            } else {
+                                Color.White.copy(alpha = 0.65f)
+                            },
+
+                        fontFamily = GameFont,
+
+                        fontSize = 8.sp,
+
+                        fontWeight = FontWeight.Black,
+
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+// ============================================================
+// CURSEUR DE TAILLE DE PLANÈTE (pin glissable)
+// ============================================================
+
+@Composable
+private fun PlanetScaleSlider(
+    initialScale: Float,
+    minScale: Float,
+    maxScale: Float,
+    onScaleChange: (Float) -> Unit
+) {
+
+    val density =
+        androidx.compose.ui.platform.LocalDensity.current
+
+    val trackWidthDp = 260.dp
+    val pinSizeDp = 22.dp
+
+    val trackWidthPx =
+        with(density) { trackWidthDp.toPx() }
+
+    val pinSizePx =
+        with(density) { pinSizeDp.toPx() }
+
+
+    var localScale by remember {
+        mutableFloatStateOf(initialScale)
+    }
+
+    val fraction =
+        ((localScale - minScale) / (maxScale - minScale))
+            .coerceIn(0f, 1f)
+
+    val pinOffsetPx =
+        fraction * (trackWidthPx - pinSizePx)
+
+
+    Box(
+        modifier = Modifier
+            .width(trackWidthDp)
+            .height(pinSizeDp)
+    ) {
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .fillMaxWidth()
+                .height(4.dp)
+                .background(
+                    Color.White.copy(alpha = 0.25f),
+                    RoundedCornerShape(2.dp)
+                )
+        )
+
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(
+                    x = with(density) { pinOffsetPx.toDp() }
+                )
+                .size(pinSizeDp)
+                .background(
+                    Color.White,
+                    CircleShape
+                )
+                .pointerInput(Unit) {
+
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+
+                            val deltaFraction =
+                                dragAmount.x /
+                                        (trackWidthPx - pinSizePx)
+
+                            val newScale =
+                                (
+                                        localScale +
+                                                deltaFraction * (maxScale - minScale)
+                                        ).coerceIn(minScale, maxScale)
+
+                            localScale = newScale
+
+                            onScaleChange(newScale)
+
+                            change.consume()
+                        }
+                    )
+                }
+        )
     }
 }
 
@@ -299,6 +985,8 @@ fun CameraMenuButton(
 fun ContinentMenuBody(
     animals: List<Animal>,
     groupFilter: GroupFilter,
+    planetScale: Float,
+    selectedSkin: PlanetSkin,
     onContinentSelected: (ContinentData) -> Unit
 ) {
 
@@ -335,6 +1023,12 @@ fun ContinentMenuBody(
 
     ContinentSphere(
         entries = entries,
+
+        planetScale =
+            planetScale,
+
+        selectedSkin =
+            selectedSkin,
 
         onContinentSelected =
             onContinentSelected
@@ -641,7 +1335,6 @@ private const val SphereScreenRadiusFraction = 0.25f
 private const val ContinentHitRadiusFraction = 0.30f
 private const val SphereRotationSensitivityDegrees = 0.35f
 
-private const val EarthScale = 0.5f
 private const val EarthDistance = 10f
 
 // Rotation de fond, toujours active, très lente (≈ un tour complet
@@ -660,6 +1353,8 @@ private const val FlingStopThreshold = 0.01f
 @Composable
 private fun ContinentSphere(
     entries: List<ContinentGridEntry>,
+    planetScale: Float,
+    selectedSkin: PlanetSkin,
     onContinentSelected: (ContinentData) -> Unit
 ) {
 
@@ -671,7 +1366,7 @@ private fun ContinentSphere(
     val earthInstance =
         rememberModelInstance(
             modelLoader,
-            "models/earth/planet_earth.glb"
+            selectedSkin.modelAssetPath
         )
 
 
@@ -821,7 +1516,7 @@ private fun ContinentSphere(
 
                     autoAnimate = false,
 
-                    scale = Scale(EarthScale),
+                    scale = Scale(planetScale),
                     position = Position(0f, 0f, 0f)
                 )
             }

@@ -36,6 +36,7 @@ fun SearchHeader(
     onFilterSelected: (Int) -> Unit,
     backgroundColor: Color,
     backButtonColor: Color = Color.White.copy(alpha = 0.18f),
+    backIcon: String = "←",
     onBack: (() -> Unit)? = null
 ) {
 
@@ -279,44 +280,58 @@ fun SearchHeader(
                     contentAlignment = Alignment.Center
                 ) {
 
-                    // Flèche dessinée à la main (au lieu du caractère "←"),
-                    // pour garantir un centrage exact au pixel près, sans
-                    // dépendre des métriques asymétriques de la police.
-                    Canvas(
-                        modifier = Modifier.size(13.dp)
-                    ) {
+                    if (backIcon == "←") {
 
-                        val strokeWidthPx = 1.8.dp.toPx()
-                        val w = size.width
-                        val h = size.height
-                        val midY = h / 2f
-                        val headSize = w * 0.42f
+                        // Flèche dessinée à la main, pour garantir un centrage
+                        // exact au pixel près, sans dépendre des métriques
+                        // asymétriques de la police.
+                        Canvas(
+                            modifier = Modifier.size(13.dp)
+                        ) {
 
-                        // Tige horizontale
-                        drawLine(
+                            val strokeWidthPx = 1.8.dp.toPx()
+                            val w = size.width
+                            val h = size.height
+                            val midY = h / 2f
+                            val headSize = w * 0.42f
+
+                            drawLine(
+                                color = Color.White,
+                                start = Offset(w, midY),
+                                end = Offset(0f, midY),
+                                strokeWidth = strokeWidthPx,
+                                cap = StrokeCap.Round
+                            )
+
+                            drawLine(
+                                color = Color.White,
+                                start = Offset(0f, midY),
+                                end = Offset(headSize, 0f),
+                                strokeWidth = strokeWidthPx,
+                                cap = StrokeCap.Round
+                            )
+
+                            drawLine(
+                                color = Color.White,
+                                start = Offset(0f, midY),
+                                end = Offset(headSize, h),
+                                strokeWidth = strokeWidthPx,
+                                cap = StrokeCap.Round
+                            )
+                        }
+
+                    } else {
+
+                        Text(
+                            text = backIcon,
+
                             color = Color.White,
-                            start = Offset(w, midY),
-                            end = Offset(0f, midY),
-                            strokeWidth = strokeWidthPx,
-                            cap = StrokeCap.Round
-                        )
 
-                        // Pointe : diagonale du haut
-                        drawLine(
-                            color = Color.White,
-                            start = Offset(0f, midY),
-                            end = Offset(headSize, 0f),
-                            strokeWidth = strokeWidthPx,
-                            cap = StrokeCap.Round
-                        )
+                            fontFamily = GameFont,
 
-                        // Pointe : diagonale du bas
-                        drawLine(
-                            color = Color.White,
-                            start = Offset(0f, midY),
-                            end = Offset(headSize, h),
-                            strokeWidth = strokeWidthPx,
-                            cap = StrokeCap.Round
+                            fontSize = 14.sp,
+
+                            fontWeight = FontWeight.Black
                         )
                     }
                 }

@@ -103,16 +103,65 @@ private val AvailablePlanetSkins: List<PlanetSkin> =
 
 
 // ============================================================
-// PERSISTANCE (skin choisi + taille de la planète)
+// SKINS DE SATELLITE ("lune")
+// ============================================================
+//
+// Même principe que les skins de planète, complètement indépendant.
+
+data class SatelliteSkin(
+    val id: String,
+    val displayName: String,
+    val modelAssetPath: String,
+    val previewImagePath: String
+)
+
+
+private val AvailableSatelliteSkins: List<SatelliteSkin> =
+    listOf(
+
+        SatelliteSkin(
+            id = "polaroid",
+            displayName = "Polaroid",
+            modelAssetPath = "models/satellite/low_poly_polaroid.glb",
+            previewImagePath = "file:///android_asset/models/satellite/images/polaroid1.png"
+        ),
+
+        SatelliteSkin(
+            id = "polaroid",
+            displayName = "Polaroid",
+            modelAssetPath = "models/satellite/low_poly_polaroid.glb",
+            previewImagePath = "file:///android_asset/models/satellite/images/polaroid1.png"
+        ),
+
+        // Prochains skins de satellite : ajouter une entrée ici.
+    )
+
+
+// ============================================================
+// PERSISTANCE (skin planète + satellite + réglages)
 // ============================================================
 
 private const val SettingsPrefsName = "animaldex_settings"
+
 private const val PrefKeySelectedSkinId = "selected_skin_id"
 private const val PrefKeyPlanetScale = "planet_scale"
+
+private const val PrefKeySelectedSatelliteSkinId = "selected_satellite_skin_id"
+private const val PrefKeySatelliteScale = "satellite_scale"
+private const val PrefKeySatelliteOrbitRadius = "satellite_orbit_radius"
+private const val PrefKeySatelliteOrbitEnabled = "satellite_orbit_enabled"
 
 private const val DefaultPlanetScale = 0.5f
 private const val MinPlanetScale = 0.1f
 private const val MaxPlanetScale = 0.9f
+
+private const val DefaultSatelliteScale = 2f
+private const val MinSatelliteScale = 0.30f
+private const val MaxSatelliteScale = 5f
+
+private const val DefaultSatelliteOrbitRadius = 8f
+private const val MinSatelliteOrbitRadius = 9f
+private const val MaxSatelliteOrbitRadius = 15f
 
 
 private fun loadSelectedSkinId(
@@ -181,6 +230,136 @@ private fun savePlanetScale(
 }
 
 
+private fun loadSelectedSatelliteSkinId(
+    context: Context
+): String {
+
+    val prefs =
+        context.getSharedPreferences(
+            SettingsPrefsName,
+            Context.MODE_PRIVATE
+        )
+
+    val fallback = AvailableSatelliteSkins.first().id
+
+    return prefs.getString(
+        PrefKeySelectedSatelliteSkinId,
+        fallback
+    ) ?: fallback
+}
+
+
+private fun saveSelectedSatelliteSkinId(
+    context: Context,
+    id: String
+) {
+
+    context.getSharedPreferences(
+        SettingsPrefsName,
+        Context.MODE_PRIVATE
+    )
+        .edit()
+        .putString(PrefKeySelectedSatelliteSkinId, id)
+        .apply()
+}
+
+
+private fun loadSatelliteScale(
+    context: Context
+): Float {
+
+    val prefs =
+        context.getSharedPreferences(
+            SettingsPrefsName,
+            Context.MODE_PRIVATE
+        )
+
+    return prefs.getFloat(
+        PrefKeySatelliteScale,
+        DefaultSatelliteScale
+    )
+}
+
+
+private fun saveSatelliteScale(
+    context: Context,
+    scale: Float
+) {
+
+    context.getSharedPreferences(
+        SettingsPrefsName,
+        Context.MODE_PRIVATE
+    )
+        .edit()
+        .putFloat(PrefKeySatelliteScale, scale)
+        .apply()
+}
+
+
+private fun loadSatelliteOrbitRadius(
+    context: Context
+): Float {
+
+    val prefs =
+        context.getSharedPreferences(
+            SettingsPrefsName,
+            Context.MODE_PRIVATE
+        )
+
+    return prefs.getFloat(
+        PrefKeySatelliteOrbitRadius,
+        DefaultSatelliteOrbitRadius
+    )
+}
+
+
+private fun saveSatelliteOrbitRadius(
+    context: Context,
+    radius: Float
+) {
+
+    context.getSharedPreferences(
+        SettingsPrefsName,
+        Context.MODE_PRIVATE
+    )
+        .edit()
+        .putFloat(PrefKeySatelliteOrbitRadius, radius)
+        .apply()
+}
+
+
+private fun loadSatelliteOrbitEnabled(
+    context: Context
+): Boolean {
+
+    val prefs =
+        context.getSharedPreferences(
+            SettingsPrefsName,
+            Context.MODE_PRIVATE
+        )
+
+    return prefs.getBoolean(
+        PrefKeySatelliteOrbitEnabled,
+        true
+    )
+}
+
+
+private fun saveSatelliteOrbitEnabled(
+    context: Context,
+    enabled: Boolean
+) {
+
+    context.getSharedPreferences(
+        SettingsPrefsName,
+        Context.MODE_PRIVATE
+    )
+        .edit()
+        .putBoolean(PrefKeySatelliteOrbitEnabled, enabled)
+        .apply()
+}
+
+
 // ============================================================
 // HOME SCREEN
 // ============================================================
@@ -208,9 +387,9 @@ fun HomeScreen(
 
 
     // --------------------------------------------------------
-    // ÉTAT PERSISTANT : skin sélectionné + taille de la planète.
-    // Chargé une seule fois depuis SharedPreferences, sauvegardé à
-    // chaque changement.
+    // ÉTAT PERSISTANT : skin planète + taille + skin satellite +
+    // ses réglages. Chargé une seule fois depuis SharedPreferences,
+    // sauvegardé à chaque changement.
     // --------------------------------------------------------
 
     var selectedSkinId by remember {
@@ -230,6 +409,38 @@ fun HomeScreen(
             AvailablePlanetSkins.firstOrNull {
                 it.id == selectedSkinId
             } ?: AvailablePlanetSkins.first()
+        }
+
+
+    var selectedSatelliteSkinId by remember {
+        mutableStateOf(
+            loadSelectedSatelliteSkinId(context)
+        )
+    }
+
+    var satelliteScale by remember {
+        mutableFloatStateOf(
+            loadSatelliteScale(context)
+        )
+    }
+
+    var satelliteOrbitRadius by remember {
+        mutableFloatStateOf(
+            loadSatelliteOrbitRadius(context)
+        )
+    }
+
+    var satelliteOrbitEnabled by remember {
+        mutableStateOf(
+            loadSatelliteOrbitEnabled(context)
+        )
+    }
+
+    val selectedSatelliteSkin =
+        remember(selectedSatelliteSkinId) {
+            AvailableSatelliteSkins.firstOrNull {
+                it.id == selectedSatelliteSkinId
+            } ?: AvailableSatelliteSkins.first()
         }
 
 
@@ -293,13 +504,6 @@ fun HomeScreen(
 
 
 
-            CameraMenuButton(
-                onClick =
-                    onCameraClick
-            )
-
-
-
             if (search.isBlank()) {
 
                 ContinentMenuBody(
@@ -314,8 +518,23 @@ fun HomeScreen(
                     selectedSkin =
                         selectedSkin,
 
+                    satelliteScale =
+                        satelliteScale,
+
+                    selectedSatelliteSkin =
+                        selectedSatelliteSkin,
+
+                    satelliteOrbitRadius =
+                        satelliteOrbitRadius,
+
+                    satelliteOrbitEnabled =
+                        satelliteOrbitEnabled,
+
                     onContinentSelected =
-                        onContinentSelected
+                        onContinentSelected,
+
+                    onCameraClick =
+                        onCameraClick
                 )
 
             } else {
@@ -406,17 +625,21 @@ fun HomeScreen(
                 } else {
 
                     SkinsPanel(
-                        skins = AvailablePlanetSkins,
-
-                        selectedSkinId = selectedSkinId,
-
+                        planetSkins = AvailablePlanetSkins,
+                        selectedPlanetSkinId = selectedSkinId,
                         planetScale = planetScale,
+
+                        satelliteSkins = AvailableSatelliteSkins,
+                        selectedSatelliteSkinId = selectedSatelliteSkinId,
+                        satelliteScale = satelliteScale,
+                        satelliteOrbitRadius = satelliteOrbitRadius,
+                        satelliteOrbitEnabled = satelliteOrbitEnabled,
 
                         onBack = {
                             showSkinsPanel = false
                         },
 
-                        onSkinSelected = { skin ->
+                        onPlanetSkinSelected = { skin ->
 
                             selectedSkinId = skin.id
 
@@ -426,13 +649,53 @@ fun HomeScreen(
                             )
                         },
 
-                        onScaleChange = { newScale ->
+                        onPlanetScaleChange = { newScale ->
 
                             planetScale = newScale
 
                             savePlanetScale(
                                 context,
                                 newScale
+                            )
+                        },
+
+                        onSatelliteSkinSelected = { skin ->
+
+                            selectedSatelliteSkinId = skin.id
+
+                            saveSelectedSatelliteSkinId(
+                                context,
+                                skin.id
+                            )
+                        },
+
+                        onSatelliteScaleChange = { newScale ->
+
+                            satelliteScale = newScale
+
+                            saveSatelliteScale(
+                                context,
+                                newScale
+                            )
+                        },
+
+                        onSatelliteOrbitRadiusChange = { newRadius ->
+
+                            satelliteOrbitRadius = newRadius
+
+                            saveSatelliteOrbitRadius(
+                                context,
+                                newRadius
+                            )
+                        },
+
+                        onSatelliteOrbitEnabledChange = { newEnabled ->
+
+                            satelliteOrbitEnabled = newEnabled
+
+                            saveSatelliteOrbitEnabled(
+                                context,
+                                newEnabled
                             )
                         }
                     )
@@ -554,18 +817,39 @@ private fun SettingsMainPanel(
 
 
 // ============================================================
-// PANNEAU SKINS (taille de la planète + liste des skins)
+// PANNEAU SKINS — onglet TERRE / SATELLITE
 // ============================================================
+
+private enum class SkinCategory {
+    TERRE, SATELLITE
+}
+
 
 @Composable
 private fun SkinsPanel(
-    skins: List<PlanetSkin>,
-    selectedSkinId: String,
+    planetSkins: List<PlanetSkin>,
+    selectedPlanetSkinId: String,
     planetScale: Float,
+
+    satelliteSkins: List<SatelliteSkin>,
+    selectedSatelliteSkinId: String,
+    satelliteScale: Float,
+    satelliteOrbitRadius: Float,
+    satelliteOrbitEnabled: Boolean,
+
     onBack: () -> Unit,
-    onSkinSelected: (PlanetSkin) -> Unit,
-    onScaleChange: (Float) -> Unit
+    onPlanetSkinSelected: (PlanetSkin) -> Unit,
+    onPlanetScaleChange: (Float) -> Unit,
+    onSatelliteSkinSelected: (SatelliteSkin) -> Unit,
+    onSatelliteScaleChange: (Float) -> Unit,
+    onSatelliteOrbitRadiusChange: (Float) -> Unit,
+    onSatelliteOrbitEnabledChange: (Boolean) -> Unit
 ) {
+
+    var category by remember {
+        mutableStateOf(SkinCategory.TERRE)
+    }
+
 
     Column {
 
@@ -623,139 +907,370 @@ private fun SkinsPanel(
         )
 
 
-        Text(
-            text = "TAILLE DE LA PLANÈTE",
+        // ------------------------------------------------
+        // ONGLETS TERRE / SATELLITE
+        // ------------------------------------------------
 
-            color =
-                Color.White.copy(alpha = 0.65f),
-
-            fontFamily = GameFont,
-
-            fontSize = 9.sp,
-
-            fontWeight = FontWeight.Black
-        )
-
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-
-        PlanetScaleSlider(
-            initialScale = planetScale,
-
-            minScale = MinPlanetScale,
-
-            maxScale = MaxPlanetScale,
-
-            onScaleChange =
-                onScaleChange
-        )
-
-
-        Spacer(
-            modifier = Modifier.height(18.dp)
-        )
-
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-
+        Row(
             horizontalArrangement =
-                Arrangement.spacedBy(10.dp),
-
-            verticalArrangement =
-                Arrangement.spacedBy(10.dp),
-
-            modifier = Modifier
-                .height(160.dp)
-                .width(260.dp)
+                Arrangement.spacedBy(8.dp)
         ) {
 
-            items(skins) { skin ->
+            listOf(
+                SkinCategory.TERRE to "TERRE",
+                SkinCategory.SATELLITE to "SATELLITE"
+            ).forEach { (cat, label) ->
 
-                val isSelected =
-                    skin.id == selectedSkinId
+                val isActive = category == cat
 
-                Column(
-                    horizontalAlignment =
-                        Alignment.CenterHorizontally,
-
+                Box(
                     modifier = Modifier
-                        .pointerInput(skin.id) {
+                        .background(
+                            Color.White.copy(
+                                alpha = if (isActive) 0.25f else 0.10f
+                            ),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .pointerInput(cat) {
 
                             detectTapGestures(
                                 onTap = {
-                                    onSkinSelected(skin)
+                                    category = cat
                                 }
                             )
                         }
+                        .padding(
+                            horizontal = 14.dp,
+                            vertical = 8.dp
+                        )
                 ) {
 
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .background(
-                                Color.White.copy(alpha = 0.10f),
-                                RoundedCornerShape(10.dp)
-                            )
-                            .then(
-                                if (isSelected) {
-                                    Modifier.background(
-                                        Color.White.copy(alpha = 0.25f),
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                } else {
-                                    Modifier
-                                }
-                            )
-                            .padding(4.dp),
-
-                        contentAlignment =
-                            Alignment.Center
-                    ) {
-
-                        AsyncImage(
-                            model = skin.previewImagePath,
-
-                            contentDescription =
-                                skin.displayName,
-
-                            modifier =
-                                Modifier.fillMaxSize(),
-
-                            contentScale =
-                                ContentScale.Fit
-                        )
-                    }
-
-
-                    Spacer(
-                        modifier = Modifier.height(4.dp)
-                    )
-
-
                     Text(
-                        text =
-                            skin.displayName.uppercase(),
+                        text = label,
 
                         color =
-                            if (isSelected) {
-                                Color.White
-                            } else {
-                                Color.White.copy(alpha = 0.65f)
-                            },
+                            Color.White.copy(
+                                alpha = if (isActive) 1f else 0.6f
+                            ),
 
                         fontFamily = GameFont,
 
-                        fontSize = 8.sp,
+                        fontSize = 10.sp,
 
-                        fontWeight = FontWeight.Black,
-
-                        maxLines = 1
+                        fontWeight = FontWeight.Black
                     )
                 }
+            }
+        }
+
+
+        Spacer(
+            modifier = Modifier.height(16.dp)
+        )
+
+
+        if (category == SkinCategory.TERRE) {
+
+            Text(
+                text = "TAILLE DE LA PLANÈTE",
+
+                color =
+                    Color.White.copy(alpha = 0.65f),
+
+                fontFamily = GameFont,
+
+                fontSize = 9.sp,
+
+                fontWeight = FontWeight.Black
+            )
+
+
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
+
+
+            LabeledSlider(
+                initialValue = planetScale,
+                minValue = MinPlanetScale,
+                maxValue = MaxPlanetScale,
+                onValueChange = onPlanetScaleChange
+            )
+
+
+            Spacer(
+                modifier = Modifier.height(18.dp)
+            )
+
+
+            SkinGrid(
+                items = planetSkins,
+                selectedId = selectedPlanetSkinId,
+                getId = { it.id },
+                getDisplayName = { it.displayName },
+                getPreviewPath = { it.previewImagePath },
+                onSelected = onPlanetSkinSelected
+            )
+
+        } else {
+
+            Text(
+                text = "TAILLE DU SATELLITE",
+
+                color =
+                    Color.White.copy(alpha = 0.65f),
+
+                fontFamily = GameFont,
+
+                fontSize = 9.sp,
+
+                fontWeight = FontWeight.Black
+            )
+
+
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
+
+
+            LabeledSlider(
+                initialValue = satelliteScale,
+                minValue = MinSatelliteScale,
+                maxValue = MaxSatelliteScale,
+                onValueChange = onSatelliteScaleChange
+            )
+
+
+            Spacer(
+                modifier = Modifier.height(14.dp)
+            )
+
+
+            Text(
+                text = "RAYON DE L'ORBITE",
+
+                color =
+                    Color.White.copy(alpha = 0.65f),
+
+                fontFamily = GameFont,
+
+                fontSize = 9.sp,
+
+                fontWeight = FontWeight.Black
+            )
+
+
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
+
+
+            LabeledSlider(
+                initialValue = satelliteOrbitRadius,
+                minValue = MinSatelliteOrbitRadius,
+                maxValue = MaxSatelliteOrbitRadius,
+                onValueChange = onSatelliteOrbitRadiusChange
+            )
+
+
+            Spacer(
+                modifier = Modifier.height(14.dp)
+            )
+
+
+            Row(
+                verticalAlignment =
+                    Alignment.CenterVertically,
+
+                modifier = Modifier
+                    .pointerInput(Unit) {
+
+                        detectTapGestures(
+                            onTap = {
+
+                                onSatelliteOrbitEnabledChange(
+                                    !satelliteOrbitEnabled
+                                )
+                            }
+                        )
+                    }
+            ) {
+
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .background(
+                            Color.White.copy(alpha = 0.15f),
+                            RoundedCornerShape(3.dp)
+                        ),
+
+                    contentAlignment =
+                        Alignment.Center
+                ) {
+
+                    if (!satelliteOrbitEnabled) {
+
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(
+                                    Color.White,
+                                    RoundedCornerShape(2.dp)
+                                )
+                        )
+                    }
+                }
+
+
+                Spacer(
+                    modifier = Modifier.width(8.dp)
+                )
+
+
+                Text(
+                    text = "Désactiver l'orbite (coin fixe)",
+
+                    color =
+                        Color.White.copy(alpha = 0.75f),
+
+                    fontFamily = GameFont,
+
+                    fontSize = 8.sp,
+
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+
+            Spacer(
+                modifier = Modifier.height(16.dp)
+            )
+
+
+            SkinGrid(
+                items = satelliteSkins,
+                selectedId = selectedSatelliteSkinId,
+                getId = { it.id },
+                getDisplayName = { it.displayName },
+                getPreviewPath = { it.previewImagePath },
+                onSelected = onSatelliteSkinSelected
+            )
+        }
+    }
+}
+
+
+// ============================================================
+// GRILLE DE SKINS (générique — réutilisée pour planète et
+// satellite)
+// ============================================================
+
+@Composable
+private fun <T> SkinGrid(
+    items: List<T>,
+    selectedId: String,
+    getId: (T) -> String,
+    getDisplayName: (T) -> String,
+    getPreviewPath: (T) -> String,
+    onSelected: (T) -> Unit
+) {
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+
+        horizontalArrangement =
+            Arrangement.spacedBy(10.dp),
+
+        verticalArrangement =
+            Arrangement.spacedBy(10.dp),
+
+        modifier = Modifier
+            .height(160.dp)
+            .width(260.dp)
+    ) {
+
+        items(items) { item ->
+
+            val isSelected =
+                getId(item) == selectedId
+
+            Column(
+                horizontalAlignment =
+                    Alignment.CenterHorizontally,
+
+                modifier = Modifier
+                    .pointerInput(getId(item)) {
+
+                        detectTapGestures(
+                            onTap = {
+                                onSelected(item)
+                            }
+                        )
+                    }
+            ) {
+
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(
+                            Color.White.copy(alpha = 0.10f),
+                            RoundedCornerShape(10.dp)
+                        )
+                        .then(
+                            if (isSelected) {
+                                Modifier.background(
+                                    Color.White.copy(alpha = 0.25f),
+                                    RoundedCornerShape(10.dp)
+                                )
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .padding(4.dp),
+
+                    contentAlignment =
+                        Alignment.Center
+                ) {
+
+                    AsyncImage(
+                        model = getPreviewPath(item),
+
+                        contentDescription =
+                            getDisplayName(item),
+
+                        modifier =
+                            Modifier.fillMaxSize(),
+
+                        contentScale =
+                            ContentScale.Fit
+                    )
+                }
+
+
+                Spacer(
+                    modifier = Modifier.height(4.dp)
+                )
+
+
+                Text(
+                    text =
+                        getDisplayName(item).uppercase(),
+
+                    color =
+                        if (isSelected) {
+                            Color.White
+                        } else {
+                            Color.White.copy(alpha = 0.65f)
+                        },
+
+                    fontFamily = GameFont,
+
+                    fontSize = 8.sp,
+
+                    fontWeight = FontWeight.Black,
+
+                    maxLines = 1
+                )
             }
         }
     }
@@ -763,15 +1278,16 @@ private fun SkinsPanel(
 
 
 // ============================================================
-// CURSEUR DE TAILLE DE PLANÈTE (pin glissable)
+// CURSEUR GÉNÉRIQUE (pin glissable) — réutilisé pour taille de
+// planète, taille de satellite, rayon d'orbite.
 // ============================================================
 
 @Composable
-private fun PlanetScaleSlider(
-    initialScale: Float,
-    minScale: Float,
-    maxScale: Float,
-    onScaleChange: (Float) -> Unit
+private fun LabeledSlider(
+    initialValue: Float,
+    minValue: Float,
+    maxValue: Float,
+    onValueChange: (Float) -> Unit
 ) {
 
     val density =
@@ -787,12 +1303,12 @@ private fun PlanetScaleSlider(
         with(density) { pinSizeDp.toPx() }
 
 
-    var localScale by remember {
-        mutableFloatStateOf(initialScale)
+    var localValue by remember(initialValue) {
+        mutableFloatStateOf(initialValue)
     }
 
     val fraction =
-        ((localScale - minScale) / (maxScale - minScale))
+        ((localValue - minValue) / (maxValue - minValue))
             .coerceIn(0f, 1f)
 
     val pinOffsetPx =
@@ -837,15 +1353,15 @@ private fun PlanetScaleSlider(
                                 dragAmount.x /
                                         (trackWidthPx - pinSizePx)
 
-                            val newScale =
+                            val newValue =
                                 (
-                                        localScale +
-                                                deltaFraction * (maxScale - minScale)
-                                        ).coerceIn(minScale, maxScale)
+                                        localValue +
+                                                deltaFraction * (maxValue - minValue)
+                                        ).coerceIn(minValue, maxValue)
 
-                            localScale = newScale
+                            localValue = newValue
 
-                            onScaleChange(newScale)
+                            onValueChange(newValue)
 
                             change.consume()
                         }
@@ -860,122 +1376,6 @@ private fun PlanetScaleSlider(
 // CAMERA MENU BUTTON
 // ============================================================
 
-@Composable
-fun CameraMenuButton(
-    onClick: () -> Unit
-) {
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                start = 7.dp,
-                end = 7.dp,
-                top = 5.dp,
-                bottom = 2.dp
-            )
-            .height(
-                45.dp
-            )
-            .background(
-                color =
-                    CameraButtonColor,
-
-                shape =
-                    RoundedCornerShape(
-                        11.dp
-                    )
-            )
-            .pointerInput(Unit) {
-
-                detectTapGestures(
-                    onTap = {
-
-                        onClick()
-                    }
-                )
-            },
-
-        contentAlignment =
-            Alignment.Center
-    ) {
-
-        Row(
-            verticalAlignment =
-                Alignment.CenterVertically,
-
-            horizontalArrangement =
-                Arrangement.Center
-        ) {
-
-            Box(
-                modifier = Modifier
-                    .width(
-                        25.dp
-                    )
-                    .height(
-                        18.dp
-                    )
-                    .background(
-                        color =
-                            Color.White,
-
-                        shape =
-                            RoundedCornerShape(
-                                4.dp
-                            )
-                    ),
-
-                contentAlignment =
-                    Alignment.Center
-            ) {
-
-                Box(
-                    modifier = Modifier
-                        .size(
-                            9.dp
-                        )
-                        .background(
-                            color =
-                                CameraButtonColor,
-
-                            shape =
-                                RoundedCornerShape(
-                                    50
-                                )
-                        )
-                )
-            }
-
-
-            Spacer(
-                modifier =
-                    Modifier.width(
-                        9.dp
-                    )
-            )
-
-
-            Text(
-                text =
-                    "ANIMAL SCANNER",
-
-                color =
-                    Color.White,
-
-                fontFamily =
-                    GameFont,
-
-                fontSize =
-                    11.sp,
-
-                fontWeight =
-                    FontWeight.Black
-            )
-        }
-    }
-}
-
 
 // ============================================================
 // CONTINENT MENU BODY
@@ -987,7 +1387,12 @@ fun ContinentMenuBody(
     groupFilter: GroupFilter,
     planetScale: Float,
     selectedSkin: PlanetSkin,
-    onContinentSelected: (ContinentData) -> Unit
+    satelliteScale: Float,
+    selectedSatelliteSkin: SatelliteSkin,
+    satelliteOrbitRadius: Float,
+    satelliteOrbitEnabled: Boolean,
+    onContinentSelected: (ContinentData) -> Unit,
+    onCameraClick: () -> Unit
 ) {
 
     val entries =
@@ -1030,8 +1435,23 @@ fun ContinentMenuBody(
         selectedSkin =
             selectedSkin,
 
+        satelliteScale =
+            satelliteScale,
+
+        selectedSatelliteSkin =
+            selectedSatelliteSkin,
+
+        satelliteOrbitRadius =
+            satelliteOrbitRadius,
+
+        satelliteOrbitEnabled =
+            satelliteOrbitEnabled,
+
         onContinentSelected =
-            onContinentSelected
+            onContinentSelected,
+
+        onSatelliteClick =
+            onCameraClick
     )
 }
 
@@ -1327,7 +1747,8 @@ private fun buildContinentBodyVertices(
 
 
 // ============================================================
-// CONTINENT SPHERE (modèle 3D réel, rotation au doigt)
+// CONTINENT SPHERE (modèle 3D réel, rotation au doigt, satellite
+// en orbite ou fixe dans le coin)
 // ============================================================
 
 
@@ -1349,14 +1770,56 @@ private const val FlingDecayFactor = 0.90f
 // comme arrêtée.
 private const val FlingStopThreshold = 0.01f
 
+// Satellite : vitesse d'orbite autour de la Terre, vitesse de
+// rotation sur lui-même, et léger angle d'inclinaison de l'orbite
+// (purement esthétique, non réglable pour l'instant).
+private const val SatelliteOrbitDegreesPerFrame = 0.35f
+private const val SatelliteSpinDegreesPerFrame = 0.6f
+private const val SatelliteOrbitElevationDegrees = 18f
+
+// Le balayage VISIBLE à l'écran de l'orbite (dans le plan right/up)
+// est mis à l'échelle séparément du réglage RAYON DE L'ORBITE, qui va
+// jusqu'à 5 : projeté tel quel sur un cercle face à la caméra, ça
+// pousserait le satellite hors de l'écran sur les côtés (la largeur
+// de l'écran étant généralement la dimension la plus contraignante,
+// contrairement à la hauteur). Ce facteur ramène le réglage dans une
+// plage qui reste toujours visible et cliquable, quelle que soit sa
+// valeur — seule la profondeur (vers/depuis la caméra) continue
+// d'utiliser le réglage brut, sans cette limite.
+private const val SatelliteLateralScale = 0.25f
+
+// Inclinaison de l'axe de rotation PROPRE du satellite (sur lui-même,
+// pas son orbite) — 0° = spin bien droit sur l'axe Y du modèle,
+// comme actuellement. Une valeur non nulle le fait "spin en biais",
+// un peu comme l'inclinaison de 23,5° de l'axe des pôles de la Terre.
+private const val SatelliteSpinTiltDegrees = 20f
+
+// Position "coin en haut à gauche" quand l'orbite est désactivée —
+// exprimée par rapport à la caméra elle-même (donc reste fixe à
+// l'écran quelle que soit la rotation de la Terre).
+private const val SatelliteHudForwardOffset = 6f
+private const val SatelliteHudRightOffset = 2f
+private const val SatelliteHudUpOffset = 1.5f
+
+// Rayon de la zone tactile autour du satellite (indépendant de son
+// échelle visuelle, pour garder une cible facile à toucher).
+private val SatelliteHitRadiusDp = 60.dp
+
 
 @Composable
 private fun ContinentSphere(
     entries: List<ContinentGridEntry>,
     planetScale: Float,
     selectedSkin: PlanetSkin,
-    onContinentSelected: (ContinentData) -> Unit
+    satelliteScale: Float,
+    selectedSatelliteSkin: SatelliteSkin,
+    satelliteOrbitRadius: Float,
+    satelliteOrbitEnabled: Boolean,
+    onContinentSelected: (ContinentData) -> Unit,
+    onSatelliteClick: () -> Unit
 ) {
+
+    val density = androidx.compose.ui.platform.LocalDensity.current
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -1367,6 +1830,12 @@ private fun ContinentSphere(
         rememberModelInstance(
             modelLoader,
             selectedSkin.modelAssetPath
+        )
+
+    val satelliteInstance =
+        rememberModelInstance(
+            modelLoader,
+            selectedSatelliteSkin.modelAssetPath
         )
 
 
@@ -1399,8 +1868,14 @@ private fun ContinentSphere(
     var lastDragDeltaX by remember { mutableFloatStateOf(0f) }
     var lastDragDeltaY by remember { mutableFloatStateOf(0f) }
 
+    // Satellite : angle d'orbite autour de la Terre + angle de
+    // rotation sur lui-même, tous deux incrémentés en continu.
+    var satelliteOrbitAngleDegrees by remember { mutableFloatStateOf(0f) }
+    var satelliteSpinDegrees by remember { mutableFloatStateOf(0f) }
 
-    // Boucle continue : rotation de fond + décélération de l'inertie.
+
+    // Boucle continue : rotation de fond + décélération de l'inertie
+    // + avancement du satellite (orbite et rotation sur lui-même).
     LaunchedEffect(Unit) {
 
         while (true) {
@@ -1432,6 +1907,12 @@ private fun ContinentSphere(
                 flingVelocityX = 0f
                 flingVelocityY = 0f
             }
+
+            satelliteOrbitAngleDegrees =
+                (satelliteOrbitAngleDegrees + SatelliteOrbitDegreesPerFrame) % 360f
+
+            satelliteSpinDegrees =
+                (satelliteSpinDegrees + SatelliteSpinDegreesPerFrame) % 360f
         }
     }
 
@@ -1455,6 +1936,122 @@ private fun ContinentSphere(
             up = Direction(y = 1f)
         )
     }
+
+
+    // --------------------------------------------------------
+    // POSITION DU SATELLITE : soit en orbite autour de la Terre
+    // (coordonnées sphériques, même principe que la caméra), soit
+    // fixe par rapport à la caméra elle-même (reste dans le coin
+    // en haut à gauche quelle que soit la rotation de la Terre).
+    // --------------------------------------------------------
+
+    val satelliteWorldPosition: Triple<Float, Float, Float> =
+
+        if (satelliteOrbitEnabled) {
+
+            val orbitAzimuthRad =
+                satelliteOrbitAngleDegrees * (PI.toFloat() / 180f)
+
+            val orbitTiltRad =
+                SatelliteOrbitElevationDegrees * (PI.toFloat() / 180f)
+
+            // Orbite verrouillée au repère de la CAMÉRA (right / up /
+            // eyeDir) plutôt qu'aux axes fixes du monde (X / Y / Z).
+            //
+            // Pourquoi : dans cette scène, "la Terre qui tourne" est en
+            // réalité la caméra qui orbite autour d'une Terre immobile
+            // (le modèle Terre n'a jamais de rotation appliquée). Donc
+            // même une orbite calculée en coordonnées monde-fixe (comme
+            // avant) reste filmée par cette même caméra mobile, et
+            // paraît entraînée par elle à l'écran — exactement comme les
+            // continents.
+            //
+            // En exprimant plutôt la position du satellite comme une
+            // combinaison de right/up/eyeDir — qui sont recalculés à
+            // CHAQUE frame à partir de la rotation actuelle de la caméra
+            // — le mouvement de la caméra s'annule exactement au rendu :
+            // seul l'angle propre du satellite (satelliteOrbitAngleDegrees)
+            // fait bouger le satellite à l'écran. La rotation automatique
+            // de fond ET le drag au doigt n'ont donc plus aucun effet sur
+            // son orbite.
+            //
+            // L'orbite se déroule maintenant dans le plan right/up, c'est
+            // à dire le plan FACE à l'écran (comme un cadran d'horloge) :
+            // right et up sont les deux axes du champ visuel, donc le
+            // satellite trace un vrai cercle visible à l'écran plutôt
+            // qu'une trajectoire vue de tranche. L'axe de cette orbite
+            // (la normale à son plan) est donc "eyeDir", la direction de
+            // visée elle-même.
+            val raw =
+                sphericalDirection(orbitAzimuthRad, orbitTiltRad)
+
+            // raw.second = petite inclinaison esthétique le long de
+            // "eyeDir" (l'axe de l'orbite, vers/depuis l'écran) — utilise
+            // le réglage RAYON DE L'ORBITE en entier, sans limite (la
+            // profondeur ne pousse pas hors du cadre de la même façon).
+            // raw.first / raw.third = le balayage circulaire réel, projeté
+            // sur "right" et "up" — mis à l'échelle par SatelliteLateralScale
+            // pour rester toujours dans la zone visible/tactile, quel que
+            // soit le réglage RAYON DE L'ORBITE.
+            val lateralRadius =
+                satelliteOrbitRadius * SatelliteLateralScale
+
+            Triple(
+                lateralRadius * (raw.first * right.first + raw.third * up.first) +
+                        satelliteOrbitRadius * raw.second * eyeDir.first,
+
+                lateralRadius * (raw.first * right.second + raw.third * up.second) +
+                        satelliteOrbitRadius * raw.second * eyeDir.second,
+
+                lateralRadius * (raw.first * right.third + raw.third * up.third) +
+                        satelliteOrbitRadius * raw.second * eyeDir.third
+            )
+
+        } else {
+
+            val eyeX = EarthDistance * eyeDir.first
+            val eyeY = EarthDistance * eyeDir.second
+            val eyeZ = EarthDistance * eyeDir.third
+
+            Triple(
+                eyeX - eyeDir.first * SatelliteHudForwardOffset +
+                        right.first * SatelliteHudRightOffset +
+                        up.first * SatelliteHudUpOffset,
+
+                eyeY - eyeDir.second * SatelliteHudForwardOffset +
+                        right.second * SatelliteHudRightOffset +
+                        up.second * SatelliteHudUpOffset,
+
+                eyeZ - eyeDir.third * SatelliteHudForwardOffset +
+                        right.third * SatelliteHudRightOffset +
+                        up.third * SatelliteHudUpOffset
+            )
+        }
+
+    val satellitePosition =
+        Position(
+            satelliteWorldPosition.first,
+            satelliteWorldPosition.second,
+            satelliteWorldPosition.third
+        )
+
+    // Position écran approximative du satellite (même projection
+    // simplifiée que celle utilisée pour les continents ci-dessous),
+    // utilisée pour savoir si un tap le touche.
+    val sphereRadiusPx =
+        min(containerSize.width, containerSize.height) * SphereScreenRadiusFraction
+
+    val satelliteScreenX =
+        sphereRadiusPx * dotProduct(satelliteWorldPosition, right)
+
+    val satelliteScreenY =
+        -sphereRadiusPx * dotProduct(satelliteWorldPosition, up)
+
+    val latestSatelliteScreenPos =
+        rememberUpdatedState(
+            Offset(satelliteScreenX, satelliteScreenY)
+        )
+
 
     val hitZones =
         remember(anchors, rotationXDegrees, rotationYDegrees, containerSize) {
@@ -1518,6 +2115,32 @@ private fun ContinentSphere(
 
                     scale = Scale(planetScale),
                     position = Position(0f, 0f, 0f)
+                )
+            }
+
+            satelliteInstance?.let { instance ->
+
+                ModelNode(
+                    modelInstance = instance,
+
+                    autoAnimate = false,
+
+                    scale = Scale(satelliteScale),
+                    position = satellitePosition,
+
+                    // Rotation sur l'axe Y (le spin lui-même) + une
+                    // inclinaison fixe sur X (SatelliteSpinTiltDegrees) pour
+                    // que ce spin se fasse "en biais" plutôt que bien droit.
+                    // ATTENTION : le commentaire plus haut dans l'historique
+                    // du projet notait qu'une combinaison à deux axes avait
+                    // posé un problème sur le modèle de la Terre — si tu
+                    // vois le même souci ici (à-coups, axe qui part dans le
+                    // mauvais sens...), baisse SatelliteSpinTiltDegrees ou
+                    // remplace x par z pour voir si ça se comporte mieux.
+                    rotation = Rotation(
+                        x = SatelliteSpinTiltDegrees,
+                        y = satelliteSpinDegrees
+                    )
                 )
             }
         }
@@ -1587,50 +2210,77 @@ private fun ContinentSphere(
                             val relativeY = tapOffset.y - centerY
 
 
-                            val (zones, sphereRadiusPx) =
-                                latestHitZones.value
+                            // Le satellite est prioritaire sur les continents :
+                            // s'il est touché, ça ouvre le scanner d'animaux,
+                            // exactement comme le bouton "ANIMAL SCANNER".
+                            val satelliteScreenPos =
+                                latestSatelliteScreenPos.value
 
-                            val hitRadiusPx =
-                                sphereRadiusPx * ContinentHitRadiusFraction
+                            val satelliteHitRadiusPx =
+                                with(density) { SatelliteHitRadiusDp.toPx() }
+
+                            val satelliteDx =
+                                satelliteScreenPos.x - relativeX
+
+                            val satelliteDy =
+                                satelliteScreenPos.y - relativeY
+
+                            val satelliteHit =
+                                satelliteDx * satelliteDx + satelliteDy * satelliteDy <=
+                                        satelliteHitRadiusPx * satelliteHitRadiusPx
 
 
-                            val hit =
-                                zones
-                                    .filter { it.clickable }
-                                    .minByOrNull { zone ->
+                            if (satelliteHit) {
 
-                                        val dx = zone.xPx - relativeX
-                                        val dy = zone.yPx - relativeY
+                                onSatelliteClick()
 
-                                        dx * dx + dy * dy
+                            } else {
+
+                                val (zones, sphereRadiusPx) =
+                                    latestHitZones.value
+
+                                val hitRadiusPx =
+                                    sphereRadiusPx * ContinentHitRadiusFraction
+
+
+                                val hit =
+                                    zones
+                                        .filter { it.clickable }
+                                        .minByOrNull { zone ->
+
+                                            val dx = zone.xPx - relativeX
+                                            val dy = zone.yPx - relativeY
+
+                                            dx * dx + dy * dy
+                                        }
+
+
+                                if (
+                                    hit != null &&
+                                    run {
+
+                                        val dx = hit.xPx - relativeX
+                                        val dy = hit.yPx - relativeY
+
+                                        dx * dx + dy * dy <=
+                                                hitRadiusPx * hitRadiusPx
                                     }
+                                ) {
 
+                                    onContinentSelected(hit.entry.continent)
 
-                            if (
-                                hit != null &&
-                                run {
+                                } else if (oceanEntry != null) {
 
-                                    val dx = hit.xPx - relativeX
-                                    val dy = hit.yPx - relativeY
+                                    val distance =
+                                        sqrt(
+                                            relativeX * relativeX +
+                                                    relativeY * relativeY
+                                        )
 
-                                    dx * dx + dy * dy <=
-                                            hitRadiusPx * hitRadiusPx
-                                }
-                            ) {
+                                    if (distance <= sphereRadiusPx) {
 
-                                onContinentSelected(hit.entry.continent)
-
-                            } else if (oceanEntry != null) {
-
-                                val distance =
-                                    sqrt(
-                                        relativeX * relativeX +
-                                                relativeY * relativeY
-                                    )
-
-                                if (distance <= sphereRadiusPx) {
-
-                                    onContinentSelected(oceanEntry.continent)
+                                        onContinentSelected(oceanEntry.continent)
+                                    }
                                 }
                             }
                         }
@@ -1693,8 +2343,6 @@ private fun ContinentSphere(
                     )
                 }
         }
-
-        val density = androidx.compose.ui.platform.LocalDensity.current
 
         bodyVertices
             .filter { body -> dotProduct(body.center, eyeDir) > 0f }

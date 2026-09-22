@@ -195,10 +195,9 @@ fun AnimalDexApp() {
             targetState = currentScreen,
             transitionSpec = {
 
-                // Paire spéciale : liste des animaux d'un groupe <-> fiche
-                // détaillée d'un animal. On y joue un zoom (avant en entrant
-                // dans la fiche, arrière en en sortant) plutôt qu'un
-                // glissement horizontal.
+                // Paire spéciale n°1 : liste des animaux d'un groupe <-> fiche
+                // détaillée d'un animal. Zoom avant en entrant dans la fiche,
+                // arrière en en sortant.
                 val isAnimalDetailPair =
                     (
                             initialState == Screen.GROUP_ANIMALS &&
@@ -206,6 +205,18 @@ fun AnimalDexApp() {
                             ) || (
                             initialState == Screen.ANIMAL_DETAIL &&
                                     targetState == Screen.GROUP_ANIMALS
+                            )
+
+                // Paire spéciale n°2 : écran d'accueil (le globe) <-> groupes
+                // d'un continent. Même principe de zoom, déclenché quand on
+                // clique sur un continent depuis le globe.
+                val isContinentZoomPair =
+                    (
+                            initialState == Screen.HOME &&
+                                    targetState == Screen.ICON_GROUPS
+                            ) || (
+                            initialState == Screen.ICON_GROUPS &&
+                                    targetState == Screen.HOME
                             )
 
 
@@ -235,6 +246,42 @@ fun AnimalDexApp() {
                         // Zoom arrière : on revient de la fiche animal vers
                         // la liste. La fiche rétrécit en s'estompant, la
                         // liste réapparaît en revenant de 115% vers 100%.
+                        (
+                                scaleIn(
+                                    initialScale = 1.15f,
+                                    animationSpec = tween(300)
+                                ) + fadeIn(tween(300))
+                                ) togetherWith (
+                                scaleOut(
+                                    targetScale = 0.85f,
+                                    animationSpec = tween(300)
+                                ) + fadeOut(tween(200))
+                                )
+                    }
+
+                } else if (isContinentZoomPair) {
+
+                    if (targetState == Screen.ICON_GROUPS) {
+
+                        // Zoom avant : on "plonge" dans le continent cliqué sur
+                        // le globe — les groupes apparaissent en grossissant
+                        // depuis 85%, pendant que le globe grossit au-delà de
+                        // 100% en s'estompant.
+                        (
+                                scaleIn(
+                                    initialScale = 0.85f,
+                                    animationSpec = tween(300)
+                                ) + fadeIn(tween(300))
+                                ) togetherWith (
+                                scaleOut(
+                                    targetScale = 1.15f,
+                                    animationSpec = tween(300)
+                                ) + fadeOut(tween(200))
+                                )
+
+                    } else {
+
+                        // Zoom arrière : on revient des groupes vers le globe.
                         (
                                 scaleIn(
                                     initialScale = 1.15f,

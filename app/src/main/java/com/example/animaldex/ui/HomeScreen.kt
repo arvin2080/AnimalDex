@@ -1,6 +1,8 @@
 package com.example.animaldex.ui
 
 import android.content.Context
+import android.os.Build
+import androidx.annotation.RequiresApi
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -183,6 +185,7 @@ private fun loadSelectedSkinId(
 }
 
 
+@RequiresApi(Build.VERSION_CODES.GINGERBREAD)
 private fun saveSelectedSkinId(
     context: Context,
     id: String
@@ -215,6 +218,7 @@ private fun loadPlanetScale(
 }
 
 
+@RequiresApi(Build.VERSION_CODES.GINGERBREAD)
 private fun savePlanetScale(
     context: Context,
     scale: Float

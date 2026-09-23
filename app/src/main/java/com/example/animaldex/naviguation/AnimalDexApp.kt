@@ -110,6 +110,8 @@ fun AnimalDexApp() {
         mutableStateOf<Animal?>(null)
     }
 
+    var detailParentScreen by remember { mutableStateOf(Screen.GROUP_ANIMALS) }
+
     var groupParentScreen by remember {
         mutableStateOf(Screen.ICON_GROUPS)
     }
@@ -174,7 +176,7 @@ fun AnimalDexApp() {
         navigatingForward = false
 
         currentScreen = when (currentScreen) {
-            Screen.ANIMAL_DETAIL -> Screen.GROUP_ANIMALS
+            Screen.ANIMAL_DETAIL -> detailParentScreen
             Screen.GROUP_ANIMALS -> groupParentScreen
             Screen.ICON_GROUPS -> Screen.HOME
             Screen.CAMERA -> Screen.HOME
@@ -403,6 +405,7 @@ fun AnimalDexApp() {
                             onAnimalSelected = { animal ->
                                 navigatingForward = true
                                 selectedAnimal = animal
+                                detailParentScreen = Screen.GROUP_ANIMALS
                                 currentScreen = Screen.ANIMAL_DETAIL
                             },
                             onBack = {
@@ -420,7 +423,7 @@ fun AnimalDexApp() {
                             color = selectedContinent?.normalColor ?: allAnimalsColor,
                             onBack = {
                                 navigatingForward = false
-                                currentScreen = Screen.GROUP_ANIMALS
+                                currentScreen = detailParentScreen
                             }
                         )
                     }
@@ -428,6 +431,13 @@ fun AnimalDexApp() {
 
                 Screen.CAMERA -> {
                     CameraScreen(
+                        animals = animals,
+                        onAnimalFound = { animal ->
+                            selectedAnimal = animal
+                            detailParentScreen = Screen.CAMERA
+                            navigatingForward = true
+                            currentScreen = Screen.ANIMAL_DETAIL
+                        },
                         onBack = {
                             navigatingForward = false
                             currentScreen = Screen.HOME

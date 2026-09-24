@@ -1,6 +1,7 @@
 package com.example.animaldex.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 
 import com.example.animaldex.model.Animal
 import com.example.animaldex.model.ContinentData
@@ -40,6 +42,12 @@ import com.example.animaldex.util.PageBackgroundColor
 
 // Fond gris foncé par défaut pour les cases non capturées, quel que soit le continent
 val UndiscoveredCardColor = Color(0xFF3A3A3D)
+
+// Réglages de l'animation de découverte (case qui se remplit de bas
+// en haut) déclenchée depuis la capture par l'appareil photo.
+private const val RevealPreDelayMs = 200L
+private const val RevealFillDurationMs = 700
+private const val RevealHoldDelayMs = 400L
 
 
 fun isConfirmKey(
@@ -107,7 +115,9 @@ fun PagedAnimalGrid(
     onBack: () -> Unit,
     onAnimalSelected: (Animal) -> Unit,
     initialPageIndex: Int = 0,
-    onPageIndexChanged: (Int) -> Unit = {}
+    onPageIndexChanged: (Int) -> Unit = {},
+    revealAnimalId: Int? = null,
+    onRevealComplete: () -> Unit = {}
 ) {
 
     PagedGrid(
@@ -139,7 +149,14 @@ fun PagedAnimalGrid(
 
             onTap = onTap,
 
-            onLongPress = onLongPress
+            onLongPress = onLongPress,
+
+            isRevealing =
+                revealAnimalId != null &&
+                        animals[index].id == revealAnimalId,
+
+            onRevealFillComplete =
+                onRevealComplete
         )
     }
 }
@@ -162,10 +179,6 @@ fun PagedContinentGrid(
 
         onBack = {},
 
-        // Un seul continent par case, toujours 9 au total : jamais plus
-        // d'une page, donc l'indicateur "x / y" et la barre du bas n'ont
-        // aucune utilité ici. On les masque pour laisser les cases
-        // s'étendre jusqu'en bas de l'écran.
         showPageIndicator = false,
 
         initialPageIndex = initialPageIndex,
@@ -228,8 +241,6 @@ fun PagedGrid(
         }
 
 
-    // Page de départ : celle fournie par l'appelant (pour reprendre où on
-    // était), ramenée dans les bornes valides.
     var pageIndex by remember(
         itemCount
     ) {
@@ -271,9 +282,6 @@ fun PagedGrid(
     }
 
 
-    // Prévient l'appelant à chaque changement de page, pour qu'il puisse
-    // la mémoriser (ex. remonter jusqu'à AnimalDexApp) et la redonner
-    // en initialPageIndex si cet écran est recréé plus tard.
     LaunchedEffect(pageIndex) {
 
         onPageIndexChanged(pageIndex)
@@ -535,11 +543,6 @@ fun PagedGrid(
             .focusable()
     ) {
 
-        // ----------------------------------------------------
-        // GRILLE DE LA PAGE, avec transition glissante smooth
-        // au changement de pageIndex (swipe ou clavier)
-        // ----------------------------------------------------
-
         AnimatedContent(
             modifier = Modifier
                 .fillMaxWidth()
@@ -551,8 +554,6 @@ fun PagedGrid(
 
                 if (targetState > initialState) {
 
-                    // page suivante : nouvelle page entre par la droite,
-                    // ancienne sort par la gauche
                     (
                             slideInHorizontally(
                                 animationSpec = tween(280)
@@ -565,8 +566,6 @@ fun PagedGrid(
 
                 } else {
 
-                    // page précédente : nouvelle page entre par la gauche,
-                    // ancienne sort par la droite
                     (
                             slideInHorizontally(
                                 animationSpec = tween(280)
@@ -753,9 +752,6 @@ fun IconGroupItem(
             .fillMaxHeight()
             .pointerInput(group.uuid) {
 
-                // Sur cet écran (liste des groupes d'un continent), un
-                // simple tap sélectionne/surligne, et il faut un DOUBLE
-                // tap pour ouvrir le groupe (remplace l'ancien appui long).
                 detectTapGestures(
                     onTap = {
                         onTap()
@@ -787,10 +783,8 @@ fun IconGroupItem(
                 .background(
                     color =
                         if (isDiscovered) {
-                            // capturé : teinte du continent (ex. orange pour Afrique)
                             continentColor
                         } else {
-                            // non capturé : gris foncé, comme la référence Pokédex
                             UndiscoveredCardColor
                         },
 
@@ -815,7 +809,6 @@ fun IconGroupItem(
                 Alignment.Center
         ) {
 
-            // Icône de l'animal, centrée et rétrécie (ne remplit plus toute la case)
             AsyncImage(
                 model = group.imagePath,
 
@@ -830,7 +823,6 @@ fun IconGroupItem(
                     ContentScale.Fit
             )
 
-            // Compteur 0/x dans le coin en haut à droite, lettres resserrées
             Text(
                 text =
                     "${group.discoveredCount}/${group.totalCount}",
@@ -850,7 +842,6 @@ fun IconGroupItem(
                     .padding(3.dp)
             )
 
-            // Nom de l'animal en bas de la case
             Text(
                 text =
                     group.displayName.uppercase(),
@@ -890,8 +881,39 @@ fun AnimalGridItem(
     continentColor: Color,
     selected: Boolean,
     onTap: () -> Unit,
-    onLongPress: () -> Unit
+    onLongPress: () -> Unit,
+    isRevealing: Boolean = false,
+    onRevealFillComplete: () -> Unit = {}
 ) {
+
+    // Fraction de remplissage de l'overlay coloré, animée de 0 (case
+    // grise) à 1 (entièrement à la couleur du continent) uniquement
+    // quand isRevealing est vrai — sinon reste à 0 et n'est jamais
+    // dessiné (voir plus bas), donc aucun changement visuel pour les
+    // cases normales.
+    val fillFraction =
+        remember {
+            Animatable(0f)
+        }
+
+
+    LaunchedEffect(isRevealing) {
+
+        if (isRevealing) {
+
+            delay(RevealPreDelayMs)
+
+            fillFraction.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(RevealFillDurationMs)
+            )
+
+            delay(RevealHoldDelayMs)
+
+            onRevealFillComplete()
+        }
+    }
+
 
     Column(
         modifier = Modifier
@@ -899,8 +921,6 @@ fun AnimalGridItem(
             .fillMaxHeight()
             .pointerInput(animal.id) {
 
-                // Sur cet écran (liste des animaux d'un groupe), un simple
-                // tap suffit pour ouvrir directement la fiche de l'animal.
                 detectTapGestures(
                     onTap = {
                         onLongPress()
@@ -927,11 +947,18 @@ fun AnimalGridItem(
                 )
                 .background(
                     color =
-                        if (animal.discovered) {
-                            // capturé : teinte du continent, comme les groupes
+
+                        // Pendant l'animation de révélation, la case
+                        // démarre systématiquement grise, même si
+                        // animal.discovered est déjà vrai en mémoire
+                        // (mis à jour avant la navigation) — c'est
+                        // l'overlay ci-dessous qui simule le passage
+                        // du gris à la couleur du continent.
+                        if (isRevealing) {
+                            UndiscoveredCardColor
+                        } else if (animal.discovered) {
                             continentColor
                         } else {
-                            // non capturé : gris foncé, comme les groupes
                             UndiscoveredCardColor
                         },
 
@@ -956,7 +983,25 @@ fun AnimalGridItem(
                 Alignment.Center
         ) {
 
-            // Icône de l'animal, centrée et rétrécie, comme pour les groupes
+            // Overlay de remplissage, ancré en bas, qui grossit vers
+            // le haut au fil de l'animation.
+            if (isRevealing) {
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight(
+                            fillFraction.value
+                        )
+                        .background(
+                            continentColor,
+                            RoundedCornerShape(11.dp)
+                        )
+                )
+            }
+
+
             if (
                 animal.localImagePath
                     .isNullOrBlank()
@@ -993,7 +1038,6 @@ fun AnimalGridItem(
                 )
             }
 
-            // Coche en haut à droite si l'animal est déjà découvert
             if (animal.discovered) {
 
                 Text(
@@ -1013,7 +1057,6 @@ fun AnimalGridItem(
                 )
             }
 
-            // Nom de l'animal en bas de la case, comme pour les groupes
             Text(
                 text =
                     animal.displayName.uppercase(),
@@ -1065,8 +1108,6 @@ fun ContinentGridItem(
             .fillMaxHeight()
             .pointerInput(continent.name) {
 
-                // Sur l'écran d'accueil, un simple tap suffit pour ouvrir
-                // directement les groupes du continent.
                 detectTapGestures(
                     onTap = {
                         onLongPress()
@@ -1092,8 +1133,6 @@ fun ContinentGridItem(
                     }
                 )
                 .background(
-                    // Toujours la couleur du continent, contrairement aux
-                    // groupes qui grisent les cases non découvertes.
                     color = continent.normalColor,
 
                     shape =
@@ -1117,9 +1156,6 @@ fun ContinentGridItem(
                 Alignment.Center
         ) {
 
-            // Image du continent, centrée et rétrécie. Fichier à ajouter
-            // dans app/src/main/assets/continents/ (voir
-            // ContinentData.imagePath pour la convention de nommage).
             AsyncImage(
                 model = continent.imagePath,
 
@@ -1134,7 +1170,6 @@ fun ContinentGridItem(
                     ContentScale.Fit
             )
 
-            // Compteur d'animaux découverts sur ce continent
             Text(
                 text =
                     "${entry.discoveredCount}/${entry.totalCount}",
@@ -1154,7 +1189,6 @@ fun ContinentGridItem(
                     .padding(3.dp)
             )
 
-            // Nom du continent en bas de la case
             Text(
                 text =
                     continent.name.uppercase(),

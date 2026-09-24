@@ -1,5 +1,8 @@
 package com.example.animaldex.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -12,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -31,6 +35,7 @@ import com.example.animaldex.util.GameFont
 fun AnimalDetailScreen(
     animal: Animal,
     color: Color,
+    justCaptured: Boolean = false,
     onBack: () -> Unit
 ) {
 
@@ -91,20 +96,6 @@ fun AnimalDetailScreen(
             )
 
 
-            // ----------------------------------------------------
-            // ZONE DU HAUT : trois blocs indépendants dans le même
-            // Box, chacun avec sa propre position :
-            // 1. Image : ancrée en haut à gauche, avec un Spacer
-            //    généreux au-dessus pour la faire descendre.
-            // 2. Nom + sous-titre : ancrés en haut, centrés dans la
-            //    moitié DROITE de l'écran (inchangé).
-            // 3. Infos (CONTINENT, FAMILLE, GENRE, STATUS) : bloc
-            //    séparé, décalé horizontalement pour démarrer juste
-            //    après l'image (pas au milieu de l'écran), et
-            //    décalé verticalement pour rester visuellement sous
-            //    le nom, comme avant.
-            // ----------------------------------------------------
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -113,8 +104,6 @@ fun AnimalDetailScreen(
                     )
             ) {
 
-                // 1. Image, avec Spacer dédié au-dessus pour la
-                // décaler vers le bas.
                 Column(
                     modifier = Modifier
                         .align(
@@ -179,8 +168,6 @@ fun AnimalDetailScreen(
                 }
 
 
-                // 2. Nom + sous-titre, centrés dans la moitié
-                // droite de l'écran, tapables (retour en arrière).
                 Column(
                     modifier = Modifier
                         .align(
@@ -261,9 +248,6 @@ fun AnimalDetailScreen(
                 }
 
 
-                // 3. Infos : démarrent juste après l'image (padding
-                // start ≈ largeur de l'image + petit espace), et
-                // décalées vers le bas pour rester sous le nom.
                 Column(
                     modifier = Modifier
                         .align(
@@ -330,20 +314,22 @@ fun AnimalDetailScreen(
                     )
 
 
+                    // STATUS affiche maintenant le nombre de captures
+                    // en plus du statut découvert/non découvert.
+                    // Petit effet "pop" quand on arrive tout juste
+                    // d'une capture (justCaptured), pour bien mettre
+                    // en valeur l'incrément du compteur.
                     DetailInfo(
                         title = "STATUS",
 
                         value =
-                            if (
-                                animal.discovered
-                            ) {
-
-                                "DISCOVERED"
-
+                            if (animal.discovered) {
+                                "DISCOVERED • ${animal.captureCount}×"
                             } else {
-
                                 "UNDISCOVERED"
-                            }
+                            },
+
+                        animatePop = justCaptured
                     )
                 }
             }
@@ -520,8 +506,37 @@ fun AnimalDetailScreen(
 @Composable
 fun DetailInfo(
     title: String,
-    value: String
+    value: String,
+    animatePop: Boolean = false
 ) {
+
+    // Petit effet "pop" (agrandissement puis retour à la taille
+    // normale, avec un léger rebond) — utilisé uniquement pour STATUS
+    // juste après une capture ; sans effet pour tous les autres
+    // appels (CONTINENT, FAMILLE, GENRE), qui gardent animatePop à
+    // sa valeur par défaut (false).
+    val popScale =
+        remember {
+            Animatable(
+                if (animatePop) 0.5f else 1f
+            )
+        }
+
+
+    LaunchedEffect(animatePop) {
+
+        if (animatePop) {
+
+            popScale.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            )
+        }
+    }
+
 
     Column(
         modifier =
@@ -552,8 +567,12 @@ fun DetailInfo(
         Text(
             text = value,
 
-            modifier =
-                Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    scaleX = popScale.value
+                    scaleY = popScale.value
+                },
 
             color = Color.White,
 

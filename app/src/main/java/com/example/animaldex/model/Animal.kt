@@ -23,7 +23,11 @@ data class Animal(
 
     val descriptionFr: String?,
 
-    val funFactFr: String?
+    val funFactFr: String?,
+
+    // Nombre de fois où cet animal a été capturé (0 si jamais vu).
+    // Valeur par défaut à 0 pour ne casser aucun appel existant.
+    val captureCount: Int = 0
 
 ) {
 

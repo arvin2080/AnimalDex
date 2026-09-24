@@ -18,7 +18,9 @@ fun GroupAnimalsScreen(
     currentPage: Int,
     onPageChange: (Int) -> Unit,
     onAnimalSelected: (Animal) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    revealAnimalId: Int? = null,
+    onRevealComplete: () -> Unit = {}
 ) {
 
     var search by remember(
@@ -52,6 +54,30 @@ fun GroupAnimalsScreen(
             searchedAnimals,
             filter
         )
+
+
+    // Si une capture vient de se produire, on force la page qui
+    // contient réellement l'animal concerné DANS CETTE liste (celle
+    // effectivement affichée par la grille) — indépendant de l'ordre
+    // exact que le tri/filtre interne pourrait appliquer.
+    val effectiveInitialPage =
+        if (revealAnimalId != null) {
+
+            val index =
+                animals.indexOfFirst {
+                    it.id == revealAnimalId
+                }
+
+            if (index >= 0) {
+                index / 9
+            } else {
+                currentPage
+            }
+
+        } else {
+
+            currentPage
+        }
 
 
     Column(
@@ -109,10 +135,16 @@ fun GroupAnimalsScreen(
                     onAnimalSelected,
 
                 initialPageIndex =
-                    currentPage,
+                    effectiveInitialPage,
 
                 onPageIndexChanged =
-                    onPageChange
+                    onPageChange,
+
+                revealAnimalId =
+                    revealAnimalId,
+
+                onRevealComplete =
+                    onRevealComplete
             )
         }
     }
@@ -202,9 +234,7 @@ fun IconGroupsScreen(
 
     val groups =
         applyGroupFilter(
-            buildIconGroups(
-                searchedAnimals
-            ),
+            buildIconGroups(searchedAnimals),
             filter
         )
 

@@ -202,6 +202,329 @@ fun restoreDiscoveries(
 }
 
 
+// ============================================================
+// COMPTEURS DE CAPTURE (nouvelle table, séparée de "discoveries")
+// ============================================================
+//
+// "discoveries" reste inchangée (toujours juste "vu / pas vu").
+// Cette table à part stocke combien de fois chaque animal a été
+// capturé. Créée nous-mêmes ici — donc entièrement sous contrôle,
+// sans dépendre du schéma du fichier animaldex.db livré dans les
+// assets.
+
+private fun ensureCaptureCountsTable(
+    database: SQLiteDatabase
+) {
+
+    database.execSQL(
+
+        """
+        CREATE TABLE IF NOT EXISTS capture_counts (
+            animal_id INTEGER PRIMARY KEY,
+            count INTEGER NOT NULL DEFAULT 0
+        )
+        """.trimIndent()
+    )
+}
+
+
+fun readExistingCaptureCounts(
+    databaseFile: java.io.File
+): Map<Int, Int> {
+
+    if (!databaseFile.exists()) {
+
+        return emptyMap()
+    }
+
+
+    return try {
+
+        val database =
+
+            SQLiteDatabase.openDatabase(
+
+                databaseFile.absolutePath,
+
+                null,
+
+                SQLiteDatabase.OPEN_READONLY
+            )
+
+
+        val result =
+            mutableMapOf<Int, Int>()
+
+
+        database.rawQuery(
+
+            "SELECT animal_id, count FROM capture_counts",
+
+            null
+
+        ).use { cursor ->
+
+            while (cursor.moveToNext()) {
+
+                result[
+                    cursor.getInt(0)
+                ] =
+                    cursor.getInt(1)
+            }
+        }
+
+
+        database.close()
+
+        result
+
+    } catch (
+        error: Exception
+    ) {
+
+        // La table peut ne pas encore exister (base pas encore
+        // migrée) — dans ce cas, pas de compteurs à restaurer.
+        emptyMap()
+    }
+}
+
+
+fun restoreCaptureCounts(
+
+    databaseFile: java.io.File,
+
+    counts: Map<Int, Int>
+) {
+
+    if (counts.isEmpty()) {
+
+        return
+    }
+
+
+    try {
+
+        val database =
+
+            SQLiteDatabase.openDatabase(
+
+                databaseFile.absolutePath,
+
+                null,
+
+                SQLiteDatabase.OPEN_READWRITE
+            )
+
+
+        ensureCaptureCountsTable(
+            database
+        )
+
+
+        database.beginTransaction()
+
+
+        try {
+
+            counts.forEach { (animalId, count) ->
+
+                database.execSQL(
+
+                    """
+                    INSERT OR REPLACE INTO capture_counts(animal_id, count)
+                    VALUES(?, ?)
+                    """.trimIndent(),
+
+                    arrayOf(
+                        animalId,
+                        count
+                    )
+                )
+            }
+
+
+            database.setTransactionSuccessful()
+
+        } finally {
+
+            database.endTransaction()
+
+            database.close()
+        }
+
+    } catch (
+        error: Exception
+    ) {
+
+        error.printStackTrace()
+    }
+}
+
+
+// Incrémente le compteur de capture d'un animal (crée la ligne à 0
+// si elle n'existe pas encore, puis l'augmente de 1). Utilise deux
+// étapes simples (INSERT OR IGNORE puis UPDATE) plutôt qu'un UPSERT
+// SQLite récent, pour rester compatible avec d'anciennes versions
+// d'Android sans mauvaise surprise.
+fun incrementAnimalCapture(
+    context: Context,
+    animalId: Int
+) {
+
+    val databaseFile =
+
+        context.getDatabasePath(
+            DATABASE_NAME
+        )
+
+
+    try {
+
+        val database =
+
+            SQLiteDatabase.openDatabase(
+
+                databaseFile.absolutePath,
+
+                null,
+
+                SQLiteDatabase.OPEN_READWRITE
+            )
+
+
+        ensureCaptureCountsTable(
+            database
+        )
+
+
+        database.beginTransaction()
+
+
+        try {
+
+            database.execSQL(
+
+                """
+                INSERT OR IGNORE INTO capture_counts(animal_id, count)
+                VALUES(?, 0)
+                """.trimIndent(),
+
+                arrayOf(
+                    animalId
+                )
+            )
+
+
+            database.execSQL(
+
+                """
+                UPDATE capture_counts
+                SET count = count + 1
+                WHERE animal_id = ?
+                """.trimIndent(),
+
+                arrayOf(
+                    animalId
+                )
+            )
+
+
+            // "discoveries" reste alimentée exactement comme avant,
+            // pour ne rien casser de ce qui en dépendait déjà.
+            database.execSQL(
+
+                """
+                INSERT OR IGNORE INTO discoveries(animal_id)
+                VALUES(?)
+                """.trimIndent(),
+
+                arrayOf(
+                    animalId
+                )
+            )
+
+
+            database.setTransactionSuccessful()
+
+        } finally {
+
+            database.endTransaction()
+
+            database.close()
+        }
+
+    } catch (
+        error: Exception
+    ) {
+
+        error.printStackTrace()
+    }
+}
+
+
+// Lit le nombre de captures actuel d'un animal (0 si jamais capturé).
+// Utile juste après incrementAnimalCapture pour savoir quoi afficher
+// (ex. "n trouvé +1") sans recharger toute la base de données.
+fun readAnimalCaptureCount(
+    context: Context,
+    animalId: Int
+): Int {
+
+    val databaseFile =
+
+        context.getDatabasePath(
+            DATABASE_NAME
+        )
+
+
+    return try {
+
+        val database =
+
+            SQLiteDatabase.openDatabase(
+
+                databaseFile.absolutePath,
+
+                null,
+
+                SQLiteDatabase.OPEN_READONLY
+            )
+
+
+        var result = 0
+
+
+        database.rawQuery(
+
+            "SELECT count FROM capture_counts WHERE animal_id = ?",
+
+            arrayOf(
+                animalId.toString()
+            )
+
+        ).use { cursor ->
+
+            if (cursor.moveToFirst()) {
+
+                result =
+                    cursor.getInt(0)
+            }
+        }
+
+
+        database.close()
+
+        result
+
+    } catch (
+        error: Exception
+    ) {
+
+        0
+    }
+}
+
+
 fun copyDatabaseFromAssets(
     context: Context
 ) {
@@ -226,6 +549,13 @@ fun copyDatabaseFromAssets(
     val oldDiscoveries =
 
         readExistingDiscoveries(
+            databaseFile
+        )
+
+
+    val oldCaptureCounts =
+
+        readExistingCaptureCounts(
             databaseFile
         )
 
@@ -270,6 +600,14 @@ fun copyDatabaseFromAssets(
 
         oldDiscoveries
     )
+
+
+    restoreCaptureCounts(
+
+        databaseFile,
+
+        oldCaptureCounts
+    )
 }
 
 
@@ -297,8 +635,16 @@ fun loadAnimalsFromDatabase(
 
             null,
 
-            SQLiteDatabase.OPEN_READONLY
+            SQLiteDatabase.OPEN_READWRITE
         )
+
+
+    // Table déjà créée par restoreCaptureCounts en temps normal, mais
+    // on s'assure qu'elle existe même sur un tout premier lancement
+    // sans aucun compteur à restaurer.
+    ensureCaptureCountsTable(
+        database
+    )
 
 
     val animals =
@@ -323,12 +669,17 @@ fun loadAnimalsFromDatabase(
             CASE
                 WHEN d.animal_id IS NULL THEN 0
                 ELSE 1
-            END AS discovered
+            END AS discovered,
+
+            COALESCE(cc.count, 0) AS capture_count
 
         FROM animals a
 
         LEFT JOIN discoveries d
             ON d.animal_id = a.id
+
+        LEFT JOIN capture_counts cc
+            ON cc.animal_id = a.id
 
         ORDER BY a.id
 
@@ -372,6 +723,9 @@ fun loadAnimalsFromDatabase(
 
         val discoveredIndex =
             cursor.getColumnIndexOrThrow("discovered")
+
+        val captureCountIndex =
+            cursor.getColumnIndexOrThrow("capture_count")
 
 
         while (cursor.moveToNext()) {
@@ -563,7 +917,12 @@ fun loadAnimalsFromDatabase(
                             cursor.getString(
                                 funFactFrIndex
                             )
-                        }
+                        },
+
+                    captureCount =
+                        cursor.getInt(
+                            captureCountIndex
+                        )
                 )
             )
         }

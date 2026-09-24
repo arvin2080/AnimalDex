@@ -18,7 +18,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 import com.example.animaldex.camera.CameraScreen
+import com.example.animaldex.camera.RecognizedAnimalResult
+import com.example.animaldex.data.incrementAnimalCapture
 import com.example.animaldex.data.loadAnimalsFromDatabase
+import com.example.animaldex.data.readAnimalCaptureCount
 import com.example.animaldex.model.Animal
 import com.example.animaldex.model.ContinentData
 import com.example.animaldex.model.IconGroup
@@ -29,6 +32,8 @@ import com.example.animaldex.ui.IconGroupsScreen
 import com.example.animaldex.util.GameFont
 import com.example.animaldex.util.PageBackgroundColor
 import com.example.animaldex.util.allAnimalsColor
+import com.example.animaldex.util.buildIconGroups
+import com.example.animaldex.util.continents
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -89,11 +94,6 @@ fun AnimalDexApp() {
         mutableStateOf(Screen.HOME)
     }
 
-    // Sens de la dernière navigation : true si on va "plus loin"
-    // (ex. HOME -> ICON_GROUPS), false si on revient en arrière.
-    // Lu par transitionSpec pour choisir le sens du glissement
-    // (ignoré pour la paire GROUP_ANIMALS <-> ANIMAL_DETAIL, qui
-    // utilise un zoom plutôt qu'un glissement).
     var navigatingForward by remember {
         mutableStateOf(true)
     }
@@ -114,20 +114,142 @@ fun AnimalDexApp() {
         mutableStateOf(Screen.ICON_GROUPS)
     }
 
-    // Page courante dans la grille des groupes d'un continent (ICON_GROUPS).
-    // Hissée ici pour survivre à un aller-retour vers GROUP_ANIMALS, où
-    // IconGroupsScreen est temporairement retiré de la composition.
     var iconGroupsPageIndex by remember {
         mutableIntStateOf(0)
     }
 
-    // Page courante dans la grille d'animaux d'un groupe (GROUP_ANIMALS).
-    // Hissée ici (au-dessus de l'écran lui-même) pour survivre à un
-    // aller-retour vers ANIMAL_DETAIL, où GroupAnimalsScreen est
-    // temporairement retiré de la composition.
     var groupAnimalsPageIndex by remember {
         mutableIntStateOf(0)
     }
+
+    // --------------------------------------------------------
+    // ÉTAT PROPRE AU FLUX "CAPTURE PAR L'APPAREIL PHOTO"
+    // --------------------------------------------------------
+    //
+    // justDiscoveredAnimalId : id de l'animal dont la case doit jouer
+    // l'animation de remplissage sur GROUP_ANIMALS (première capture
+    // uniquement). null = pas d'animation en cours.
+    //
+    // justCapturedFlag : indique à AnimalDetailScreen qu'il vient
+    // d'être atteint via une capture (première fois OU déjà connu),
+    // pour déclencher le petit effet visuel sur le compteur dans
+    // STATUS. Remis à false dès qu'on quitte cette fiche ou qu'on y
+    // arrive par un chemin normal (tap dans une grille).
+
+    var justDiscoveredAnimalId by remember {
+        mutableStateOf<Int?>(null)
+    }
+
+    var justCapturedFlag by remember {
+        mutableStateOf(false)
+    }
+
+
+    // --------------------------------------------------------
+    // GESTION D'UNE RECONNAISSANCE RÉUSSIE (bouton photo -> IA)
+    // --------------------------------------------------------
+
+    fun handleAnimalRecognized(
+        result: RecognizedAnimalResult
+    ) {
+
+        val recognizedId =
+            result.animalId
+
+        if (
+            !result.recognized ||
+            recognizedId == null
+        ) {
+
+            // Non reconnu : on reste simplement sur la caméra (déjà
+            // le comportement par défaut une fois l'overlay masqué).
+            return
+        }
+
+
+        val currentAnimal =
+            animals.firstOrNull {
+                it.id == recognizedId
+            }
+                ?: return
+
+
+        val wasAlreadyDiscovered =
+            currentAnimal.discovered
+
+
+        // Met à jour la base de données (compteur + discoveries).
+        incrementAnimalCapture(
+            context,
+            recognizedId
+        )
+
+        val newCount =
+            readAnimalCaptureCount(
+                context,
+                recognizedId
+            )
+
+        val updatedAnimal =
+            currentAnimal.copy(
+                discovered = true,
+                captureCount = newCount
+            )
+
+
+        // Remplace uniquement cette entrée dans la liste en mémoire.
+        animals =
+            animals.map { animal ->
+
+                if (animal.id == recognizedId) {
+                    updatedAnimal
+                } else {
+                    animal
+                }
+            }
+
+
+        selectedAnimal =
+            updatedAnimal
+
+        selectedContinent =
+            continents.firstOrNull { continent ->
+                updatedAnimal.continents.contains(
+                    continent.name
+                )
+            }
+
+        selectedGroup =
+            buildIconGroups(animals).firstOrNull { group ->
+                group.animals.any {
+                    it.id == recognizedId
+                }
+            }
+
+        groupParentScreen =
+            Screen.HOME
+
+        groupAnimalsPageIndex = 0
+
+        navigatingForward = true
+
+
+        if (wasAlreadyDiscovered) {
+
+            justDiscoveredAnimalId = null
+            justCapturedFlag = true
+
+            currentScreen = Screen.ANIMAL_DETAIL
+
+        } else {
+
+            justCapturedFlag = false
+            justDiscoveredAnimalId = recognizedId
+
+            currentScreen = Screen.GROUP_ANIMALS
+        }
+    }
+
 
     // ========================================================
     // LOAD DATABASE
@@ -173,12 +295,26 @@ fun AnimalDexApp() {
     ) {
         navigatingForward = false
 
-        currentScreen = when (currentScreen) {
-            Screen.ANIMAL_DETAIL -> Screen.GROUP_ANIMALS
-            Screen.GROUP_ANIMALS -> groupParentScreen
-            Screen.ICON_GROUPS -> Screen.HOME
-            Screen.CAMERA -> Screen.HOME
-            Screen.HOME -> Screen.HOME
+        when (currentScreen) {
+
+            Screen.ANIMAL_DETAIL -> {
+                justCapturedFlag = false
+                currentScreen = Screen.GROUP_ANIMALS
+            }
+
+            Screen.GROUP_ANIMALS -> {
+                justDiscoveredAnimalId = null
+                currentScreen = groupParentScreen
+            }
+
+            Screen.ICON_GROUPS ->
+                currentScreen = Screen.HOME
+
+            Screen.CAMERA ->
+                currentScreen = Screen.HOME
+
+            Screen.HOME ->
+                currentScreen = Screen.HOME
         }
     }
 
@@ -195,9 +331,6 @@ fun AnimalDexApp() {
             targetState = currentScreen,
             transitionSpec = {
 
-                // Paire spéciale n°1 : liste des animaux d'un groupe <-> fiche
-                // détaillée d'un animal. Zoom avant en entrant dans la fiche,
-                // arrière en en sortant.
                 val isAnimalDetailPair =
                     (
                             initialState == Screen.GROUP_ANIMALS &&
@@ -207,9 +340,6 @@ fun AnimalDexApp() {
                                     targetState == Screen.GROUP_ANIMALS
                             )
 
-                // Paire spéciale n°2 : écran d'accueil (le globe) <-> groupes
-                // d'un continent. Même principe de zoom, déclenché quand on
-                // clique sur un continent depuis le globe.
                 val isContinentZoomPair =
                     (
                             initialState == Screen.HOME &&
@@ -224,11 +354,6 @@ fun AnimalDexApp() {
 
                     if (targetState == Screen.ANIMAL_DETAIL) {
 
-                        // Zoom avant : la fiche animal apparaît en grossissant
-                        // légèrement depuis 85%, pendant que la liste des
-                        // animaux s'éloigne (grossit au-delà de 100% en
-                        // s'estompant), comme si on "plongeait" dans la case
-                        // cliquée.
                         (
                                 scaleIn(
                                     initialScale = 0.85f,
@@ -243,9 +368,6 @@ fun AnimalDexApp() {
 
                     } else {
 
-                        // Zoom arrière : on revient de la fiche animal vers
-                        // la liste. La fiche rétrécit en s'estompant, la
-                        // liste réapparaît en revenant de 115% vers 100%.
                         (
                                 scaleIn(
                                     initialScale = 1.15f,
@@ -263,10 +385,6 @@ fun AnimalDexApp() {
 
                     if (targetState == Screen.ICON_GROUPS) {
 
-                        // Zoom avant : on "plonge" dans le continent cliqué sur
-                        // le globe — les groupes apparaissent en grossissant
-                        // depuis 85%, pendant que le globe grossit au-delà de
-                        // 100% en s'estompant.
                         (
                                 scaleIn(
                                     initialScale = 0.85f,
@@ -281,7 +399,6 @@ fun AnimalDexApp() {
 
                     } else {
 
-                        // Zoom arrière : on revient des groupes vers le globe.
                         (
                                 scaleIn(
                                     initialScale = 1.15f,
@@ -297,9 +414,6 @@ fun AnimalDexApp() {
 
                 } else if (navigatingForward) {
 
-                    // Navigation vers l'avant (toutes les autres paires
-                    // d'écrans) : nouvel écran entre par la droite, ancien
-                    // sort par la gauche.
                     (
                             slideInHorizontally(
                                 animationSpec = spring(
@@ -318,9 +432,6 @@ fun AnimalDexApp() {
 
                 } else {
 
-                    // Retour en arrière (toutes les autres paires
-                    // d'écrans) : glissement inversé, nouvel écran entre
-                    // par la gauche, ancien sort par la droite.
                     (
                             slideInHorizontally(
                                 animationSpec = spring(
@@ -403,11 +514,20 @@ fun AnimalDexApp() {
                             onAnimalSelected = { animal ->
                                 navigatingForward = true
                                 selectedAnimal = animal
+                                justCapturedFlag = false
                                 currentScreen = Screen.ANIMAL_DETAIL
                             },
                             onBack = {
                                 navigatingForward = false
+                                justDiscoveredAnimalId = null
                                 currentScreen = groupParentScreen
+                            },
+                            revealAnimalId = justDiscoveredAnimalId,
+                            onRevealComplete = {
+                                justDiscoveredAnimalId = null
+                                justCapturedFlag = true
+                                navigatingForward = true
+                                currentScreen = Screen.ANIMAL_DETAIL
                             }
                         )
                     }
@@ -418,8 +538,10 @@ fun AnimalDexApp() {
                         AnimalDetailScreen(
                             animal = animal,
                             color = selectedContinent?.normalColor ?: allAnimalsColor,
+                            justCaptured = justCapturedFlag,
                             onBack = {
                                 navigatingForward = false
+                                justCapturedFlag = false
                                 currentScreen = Screen.GROUP_ANIMALS
                             }
                         )
@@ -431,6 +553,9 @@ fun AnimalDexApp() {
                         onBack = {
                             navigatingForward = false
                             currentScreen = Screen.HOME
+                        },
+                        onAnimalRecognized = { result ->
+                            handleAnimalRecognized(result)
                         }
                     )
                 }

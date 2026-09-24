@@ -18,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 import com.example.animaldex.camera.CameraScreen
-import com.example.animaldex.camera.RecognizedAnimalResult
 import com.example.animaldex.data.incrementAnimalCapture
 import com.example.animaldex.data.loadAnimalsFromDatabase
 import com.example.animaldex.data.readAnimalCaptureCount
@@ -110,6 +109,13 @@ fun AnimalDexApp() {
         mutableStateOf<Animal?>(null)
     }
 
+    // D'où on vient quand on quitte ANIMAL_DETAIL — normalement
+    // GROUP_ANIMALS, mais CAMERA quand on arrive directement d'une
+    // capture d'un animal déjà connu.
+    var detailParentScreen by remember {
+        mutableStateOf(Screen.GROUP_ANIMALS)
+    }
+
     var groupParentScreen by remember {
         mutableStateOf(Screen.ICON_GROUPS)
     }
@@ -125,16 +131,6 @@ fun AnimalDexApp() {
     // --------------------------------------------------------
     // ÉTAT PROPRE AU FLUX "CAPTURE PAR L'APPAREIL PHOTO"
     // --------------------------------------------------------
-    //
-    // justDiscoveredAnimalId : id de l'animal dont la case doit jouer
-    // l'animation de remplissage sur GROUP_ANIMALS (première capture
-    // uniquement). null = pas d'animation en cours.
-    //
-    // justCapturedFlag : indique à AnimalDetailScreen qu'il vient
-    // d'être atteint via une capture (première fois OU déjà connu),
-    // pour déclencher le petit effet visuel sur le compteur dans
-    // STATUS. Remis à false dès qu'on quitte cette fiche ou qu'on y
-    // arrive par un chemin normal (tap dans une grille).
 
     var justDiscoveredAnimalId by remember {
         mutableStateOf<Int?>(null)
@@ -145,63 +141,36 @@ fun AnimalDexApp() {
     }
 
 
-    // --------------------------------------------------------
-    // GESTION D'UNE RECONNAISSANCE RÉUSSIE (bouton photo -> IA)
-    // --------------------------------------------------------
-
     fun handleAnimalRecognized(
-        result: RecognizedAnimalResult
+        recognizedAnimal: Animal
     ) {
 
-        val recognizedId =
-            result.animalId
-
-        if (
-            !result.recognized ||
-            recognizedId == null
-        ) {
-
-            // Non reconnu : on reste simplement sur la caméra (déjà
-            // le comportement par défaut une fois l'overlay masqué).
-            return
-        }
-
-
-        val currentAnimal =
-            animals.firstOrNull {
-                it.id == recognizedId
-            }
-                ?: return
-
-
         val wasAlreadyDiscovered =
-            currentAnimal.discovered
+            recognizedAnimal.discovered
 
 
-        // Met à jour la base de données (compteur + discoveries).
         incrementAnimalCapture(
             context,
-            recognizedId
+            recognizedAnimal.id
         )
 
         val newCount =
             readAnimalCaptureCount(
                 context,
-                recognizedId
+                recognizedAnimal.id
             )
 
         val updatedAnimal =
-            currentAnimal.copy(
+            recognizedAnimal.copy(
                 discovered = true,
                 captureCount = newCount
             )
 
 
-        // Remplace uniquement cette entrée dans la liste en mémoire.
         animals =
             animals.map { animal ->
 
-                if (animal.id == recognizedId) {
+                if (animal.id == recognizedAnimal.id) {
                     updatedAnimal
                 } else {
                     animal
@@ -222,7 +191,7 @@ fun AnimalDexApp() {
         selectedGroup =
             buildIconGroups(animals).firstOrNull { group ->
                 group.animals.any {
-                    it.id == recognizedId
+                    it.id == recognizedAnimal.id
                 }
             }
 
@@ -239,12 +208,14 @@ fun AnimalDexApp() {
             justDiscoveredAnimalId = null
             justCapturedFlag = true
 
+            detailParentScreen = Screen.CAMERA
+
             currentScreen = Screen.ANIMAL_DETAIL
 
         } else {
 
             justCapturedFlag = false
-            justDiscoveredAnimalId = recognizedId
+            justDiscoveredAnimalId = recognizedAnimal.id
 
             currentScreen = Screen.GROUP_ANIMALS
         }
@@ -299,7 +270,7 @@ fun AnimalDexApp() {
 
             Screen.ANIMAL_DETAIL -> {
                 justCapturedFlag = false
-                currentScreen = Screen.GROUP_ANIMALS
+                currentScreen = detailParentScreen
             }
 
             Screen.GROUP_ANIMALS -> {
@@ -515,6 +486,7 @@ fun AnimalDexApp() {
                                 navigatingForward = true
                                 selectedAnimal = animal
                                 justCapturedFlag = false
+                                detailParentScreen = Screen.GROUP_ANIMALS
                                 currentScreen = Screen.ANIMAL_DETAIL
                             },
                             onBack = {
@@ -526,6 +498,7 @@ fun AnimalDexApp() {
                             onRevealComplete = {
                                 justDiscoveredAnimalId = null
                                 justCapturedFlag = true
+                                detailParentScreen = Screen.GROUP_ANIMALS
                                 navigatingForward = true
                                 currentScreen = Screen.ANIMAL_DETAIL
                             }
@@ -542,7 +515,7 @@ fun AnimalDexApp() {
                             onBack = {
                                 navigatingForward = false
                                 justCapturedFlag = false
-                                currentScreen = Screen.GROUP_ANIMALS
+                                currentScreen = detailParentScreen
                             }
                         )
                     }
@@ -550,12 +523,13 @@ fun AnimalDexApp() {
 
                 Screen.CAMERA -> {
                     CameraScreen(
+                        animals = animals,
+                        onAnimalFound = { animal ->
+                            handleAnimalRecognized(animal)
+                        },
                         onBack = {
                             navigatingForward = false
                             currentScreen = Screen.HOME
-                        },
-                        onAnimalRecognized = { result ->
-                            handleAnimalRecognized(result)
                         }
                     )
                 }

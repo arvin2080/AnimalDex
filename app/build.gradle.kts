@@ -51,6 +51,7 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
     // SceneView (rendu 3D, moteur Filament) — uniquement le module 3D,
     // pas besoin du module AR (arsceneview) pour ce qu'on fait ici.
     implementation("io.github.sceneview:sceneview:4.32.0")

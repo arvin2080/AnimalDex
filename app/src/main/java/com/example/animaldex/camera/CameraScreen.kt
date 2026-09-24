@@ -8,18 +8,18 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 
 import androidx.compose.runtime.*
@@ -43,6 +44,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.viewinterop.AndroidView
 
 import androidx.compose.ui.text.font.FontWeight
@@ -52,27 +54,17 @@ import androidx.compose.ui.unit.sp
 
 import androidx.core.content.ContextCompat
 
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+import com.example.animaldex.model.Animal
 import com.example.animaldex.util.GameFont
-
-
-// ============================================================
-// RÉSULTAT DE RECONNAISSANCE (provisoire)
-// ============================================================
-//
-// animalId correspond directement à Animal.id (Int) côté base de
-// données — plus de conversion à faire côté appelant.
-
-data class RecognizedAnimalResult(
-    val animalId: Int?,
-    val recognized: Boolean
-)
 
 
 // ============================================================
@@ -127,31 +119,6 @@ private fun addPendingRecognitionPhoto(
 
 
 // ============================================================
-// RECONNAISSANCE (FACTICE POUR L'INSTANT)
-// ============================================================
-//
-// TODO : remplacer entièrement le corps de cette fonction par le
-// vrai appel à l'API de reconnaissance une fois prête.
-
-private suspend fun recognizeAnimalStub(
-    photoPath: String
-): RecognizedAnimalResult {
-
-    delay(2500)
-
-    return RecognizedAnimalResult(
-
-        // TODO : id de test — remplace par le vrai résultat de l'API.
-        // Doit correspondre à un Animal.id existant dans ta base pour
-        // que le flux fonctionne de bout en bout tel quel.
-        animalId = 1,
-
-        recognized = true
-    )
-}
-
-
-// ============================================================
 // ÉTAT DU FLUX DE CAPTURE
 // ============================================================
 
@@ -167,8 +134,9 @@ private enum class CaptureFlowState {
 
 @Composable
 fun CameraScreen(
-    onBack: () -> Unit,
-    onAnimalRecognized: (RecognizedAnimalResult) -> Unit = {}
+    animals: List<Animal>,
+    onAnimalFound: (Animal) -> Unit,
+    onBack: () -> Unit
 ) {
 
     val context =
@@ -217,8 +185,9 @@ fun CameraScreen(
     if (cameraPermissionGranted) {
 
         CameraPreview(
-            onBack = onBack,
-            onAnimalRecognized = onAnimalRecognized
+            animals = animals,
+            onAnimalFound = onAnimalFound,
+            onBack = onBack
         )
 
     } else {
@@ -239,8 +208,9 @@ fun CameraScreen(
 
 @Composable
 private fun CameraPreview(
-    onBack: () -> Unit,
-    onAnimalRecognized: (RecognizedAnimalResult) -> Unit
+    animals: List<Animal>,
+    onAnimalFound: (Animal) -> Unit,
+    onBack: () -> Unit
 ) {
 
     val context =
@@ -251,6 +221,25 @@ private fun CameraPreview(
 
     val coroutineScope =
         rememberCoroutineScope()
+
+    val prefs =
+        remember {
+            context.getSharedPreferences(
+                "scanner_config",
+                Context.MODE_PRIVATE
+            )
+        }
+
+
+    var apiKey by remember {
+        mutableStateOf(
+            prefs.getString("openai_api_key", "") ?: ""
+        )
+    }
+
+    var showSettings by remember {
+        mutableStateOf(false)
+    }
 
 
     var flowState by remember {
@@ -269,6 +258,14 @@ private fun CameraPreview(
         mutableFloatStateOf(0f)
     }
 
+    var statusMessage by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    var recognitionJob by remember {
+        mutableStateOf<Job?>(null)
+    }
+
 
     LaunchedEffect(flowState) {
 
@@ -278,7 +275,7 @@ private fun CameraPreview(
 
             while (true) {
 
-                delay(100)
+                kotlinx.coroutines.delay(100)
 
                 elapsedSeconds += 0.1f
             }
@@ -315,6 +312,9 @@ private fun CameraPreview(
                 .build()
 
 
+        statusMessage = null
+
+
         capture.takePicture(
             outputOptions,
 
@@ -333,24 +333,119 @@ private fun CameraPreview(
                         CaptureFlowState.RECOGNIZING
 
 
-                    coroutineScope.launch {
+                    recognitionJob =
+                        coroutineScope.launch {
 
-                        val result =
-                            recognizeAnimalStub(
-                                outputFile.absolutePath
-                            )
+                            val startTimeMs =
+                                System.currentTimeMillis()
 
-                        if (
-                            flowState ==
-                            CaptureFlowState.RECOGNIZING
-                        ) {
+                            var recognizedAnimal: Animal? = null
+                            var failureMessage: String? = null
 
-                            onAnimalRecognized(result)
+
+                            try {
+
+                                val identification =
+                                    withContext(Dispatchers.IO) {
+
+                                        val jpeg =
+                                            compressPhoto(outputFile)
+
+                                        identifyPhoto(context, jpeg)
+                                    }
+
+                                val animal =
+                                    matchAnimal(animals, identification)
+
+                                if (animal != null) {
+
+                                    recognizedAnimal = animal
+
+                                } else {
+
+                                    failureMessage =
+                                        "${identification.commonName ?: "Animal inconnu"} " +
+                                                "(${identification.scientificName ?: "nom scientifique inconnu"}) : " +
+                                                "aucune fiche exacte dans AnimalDex."
+                                }
+
+                            } catch (
+                                error: Exception
+                            ) {
+
+                                failureMessage =
+                                    error.message
+                                        ?: "Identification impossible. Vérifie Internet et ta clé API."
+                            }
+
+
+                            // ================================================
+                            // BLOC DE TEST — À SUPPRIMER une fois l'API fiable.
+                            // Si rien n'a été reconnu (erreur ou pas de fiche
+                            // correspondante), simule la découverte d'un
+                            // langur du Nilgiri pour tester l'animation de
+                            // capture sans dépendre de l'API.
+                            // ================================================
+                            if (recognizedAnimal == null) {
+
+                                val testFallback =
+                                    animals.firstOrNull { candidate ->
+
+                                        val hasNilgiri =
+                                            listOfNotNull(
+                                                candidate.nameFr,
+                                                candidate.commonNameEN,
+                                                candidate.scientificName
+                                            ).any {
+                                                it.contains("nilgiri", ignoreCase = true)
+                                            }
+
+                                        val hasLangur =
+                                            listOfNotNull(
+                                                candidate.nameFr,
+                                                candidate.commonNameEN
+                                            ).any {
+                                                it.contains("langur", ignoreCase = true)
+                                            }
+
+                                        hasNilgiri && hasLangur
+                                    }
+
+                                if (testFallback != null) {
+
+                                    recognizedAnimal = testFallback
+                                    failureMessage = null
+                                }
+                            }
+                            // ================================================
+                            // FIN DU BLOC DE TEST
+                            // ================================================
+
+
+                            val elapsed =
+                                System.currentTimeMillis() - startTimeMs
+
+                            val remaining =
+                                2500L - elapsed
+
+                            if (remaining > 0) {
+
+                                kotlinx.coroutines.delay(remaining)
+                            }
+
+
+                            if (recognizedAnimal != null) {
+
+                                onAnimalFound(recognizedAnimal)
+
+                            } else {
+
+                                statusMessage = failureMessage
+                            }
 
                             flowState =
                                 CaptureFlowState.PREVIEW
                         }
-                    }
                 }
 
 
@@ -359,6 +454,9 @@ private fun CameraPreview(
                 ) {
 
                     exception.printStackTrace()
+
+                    statusMessage =
+                        "Erreur de capture : ${exception.message}"
 
                     flowState =
                         CaptureFlowState.PREVIEW
@@ -370,6 +468,8 @@ private fun CameraPreview(
 
     fun findLater() {
 
+        recognitionJob?.cancel()
+
         lastCapturedPhotoPath?.let { path ->
 
             addPendingRecognitionPhoto(
@@ -377,6 +477,8 @@ private fun CameraPreview(
                 path
             )
         }
+
+        statusMessage = null
 
         flowState =
             CaptureFlowState.PREVIEW
@@ -467,18 +569,28 @@ private fun CameraPreview(
         )
 
 
-        Box(
+        Row(
             modifier = Modifier
-                .align(
-                    Alignment.TopStart
-                )
+                .align(Alignment.TopEnd)
                 .padding(
                     top = 35.dp,
-                    start = 10.dp
-                )
+                    end = 10.dp
+                ),
+
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
         ) {
 
-            CameraBackButton(
+            CameraSmallButton(
+                icon = "⚙",
+                onClick = {
+                    showSettings = !showSettings
+                }
+            )
+
+
+            CameraSmallButton(
+                icon = "←",
                 onClick = onBack
             )
         }
@@ -500,6 +612,44 @@ private fun CameraPreview(
         }
 
 
+        if (
+            statusMessage != null &&
+            flowState == CaptureFlowState.PREVIEW
+        ) {
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(
+                        bottom = 110.dp,
+                        start = 20.dp,
+                        end = 20.dp
+                    )
+                    .background(
+                        Color.Black.copy(alpha = 0.75f),
+                        RoundedCornerShape(10.dp)
+                    )
+                    .padding(
+                        horizontal = 14.dp,
+                        vertical = 9.dp
+                    )
+            ) {
+
+                Text(
+                    text = statusMessage ?: "",
+
+                    color = Color.White,
+
+                    fontFamily = GameFont,
+
+                    fontSize = 9.sp,
+
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+
         if (flowState == CaptureFlowState.PREVIEW) {
 
             Box(
@@ -508,19 +658,148 @@ private fun CameraPreview(
                     .padding(24.dp)
                     .size(64.dp)
                     .background(
-                        Color(0xFFE53935),
+                        if (!showSettings) {
+                            Color(0xFFE53935)
+                        } else {
+                            Color(0xFFE53935).copy(alpha = 0.4f)
+                        },
                         CircleShape
+                    )
+                    .pointerInput(showSettings) {
+
+                        detectTapGestures(
+                            onTap = {
+
+                                if (!showSettings) {
+
+                                    takePhotoAndRecognize()
+                                }
+                            }
+                        )
+                    }
+            )
+        }
+
+
+        if (showSettings) {
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Color.Black.copy(alpha = 0.55f)
                     )
                     .pointerInput(Unit) {
 
                         detectTapGestures(
                             onTap = {
-
-                                takePhotoAndRecognize()
+                                showSettings = false
                             }
                         )
                     }
             )
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 24.dp)
+                    .background(
+                        Color(0xFF101820),
+                        RoundedCornerShape(14.dp)
+                    )
+                    .pointerInput(Unit) {
+
+                        detectTapGestures(
+                            onTap = {}
+                        )
+                    }
+                    .padding(16.dp)
+            ) {
+
+                Text(
+                    text = "CLÉ API OPENAI",
+
+                    color = Color.White,
+
+                    fontFamily = GameFont,
+
+                    fontSize = 12.sp,
+
+                    fontWeight = FontWeight.Black
+                )
+
+
+                Spacer(
+                    modifier = Modifier.height(10.dp)
+                )
+
+
+                OutlinedTextField(
+                    value = apiKey,
+
+                    onValueChange = {
+                        apiKey = it
+                    },
+
+                    label = {
+                        Text("Clé API OpenAI")
+                    },
+
+                    visualTransformation =
+                        PasswordVisualTransformation(),
+
+                    singleLine = true,
+
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+
+                Spacer(
+                    modifier = Modifier.height(10.dp)
+                )
+
+
+                Box(
+                    modifier = Modifier
+                        .background(
+                            Color.White,
+                            RoundedCornerShape(8.dp)
+                        )
+                        .pointerInput(Unit) {
+
+                            detectTapGestures(
+                                onTap = {
+
+                                    prefs.edit()
+                                        .putString(
+                                            "openai_api_key",
+                                            apiKey.trim()
+                                        )
+                                        .apply()
+
+                                    showSettings = false
+                                }
+                            )
+                        }
+                        .padding(
+                            horizontal = 16.dp,
+                            vertical = 9.dp
+                        )
+                ) {
+
+                    Text(
+                        text = "ENREGISTRER",
+
+                        color = Color.Black,
+
+                        fontFamily = GameFont,
+
+                        fontSize = 10.sp,
+
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
         }
 
 
@@ -723,156 +1002,83 @@ private fun ScannerCorners() {
 
         Box(
             modifier = Modifier
-                .align(
-                    Alignment.TopStart
-                )
-                .width(
-                    cornerLength
-                )
-                .height(
-                    lineWidth
-                )
-                .background(
-                    lineColor
-                )
+                .align(Alignment.TopStart)
+                .width(cornerLength)
+                .height(lineWidth)
+                .background(lineColor)
         )
-
 
         Box(
             modifier = Modifier
-                .align(
-                    Alignment.TopStart
-                )
-                .width(
-                    lineWidth
-                )
-                .height(
-                    cornerLength
-                )
-                .background(
-                    lineColor
-                )
+                .align(Alignment.TopStart)
+                .width(lineWidth)
+                .height(cornerLength)
+                .background(lineColor)
         )
-
 
         Box(
             modifier = Modifier
-                .align(
-                    Alignment.TopEnd
-                )
-                .width(
-                    cornerLength
-                )
-                .height(
-                    lineWidth
-                )
-                .background(
-                    lineColor
-                )
+                .align(Alignment.TopEnd)
+                .width(cornerLength)
+                .height(lineWidth)
+                .background(lineColor)
         )
-
 
         Box(
             modifier = Modifier
-                .align(
-                    Alignment.TopEnd
-                )
-                .width(
-                    lineWidth
-                )
-                .height(
-                    cornerLength
-                )
-                .background(
-                    lineColor
-                )
+                .align(Alignment.TopEnd)
+                .width(lineWidth)
+                .height(cornerLength)
+                .background(lineColor)
         )
-
 
         Box(
             modifier = Modifier
-                .align(
-                    Alignment.BottomStart
-                )
-                .width(
-                    cornerLength
-                )
-                .height(
-                    lineWidth
-                )
-                .background(
-                    lineColor
-                )
+                .align(Alignment.BottomStart)
+                .width(cornerLength)
+                .height(lineWidth)
+                .background(lineColor)
         )
-
 
         Box(
             modifier = Modifier
-                .align(
-                    Alignment.BottomStart
-                )
-                .width(
-                    lineWidth
-                )
-                .height(
-                    cornerLength
-                )
-                .background(
-                    lineColor
-                )
+                .align(Alignment.BottomStart)
+                .width(lineWidth)
+                .height(cornerLength)
+                .background(lineColor)
         )
-
 
         Box(
             modifier = Modifier
-                .align(
-                    Alignment.BottomEnd
-                )
-                .width(
-                    cornerLength
-                )
-                .height(
-                    lineWidth
-                )
-                .background(
-                    lineColor
-                )
+                .align(Alignment.BottomEnd)
+                .width(cornerLength)
+                .height(lineWidth)
+                .background(lineColor)
         )
-
 
         Box(
             modifier = Modifier
-                .align(
-                    Alignment.BottomEnd
-                )
-                .width(
-                    lineWidth
-                )
-                .height(
-                    cornerLength
-                )
-                .background(
-                    lineColor
-                )
+                .align(Alignment.BottomEnd)
+                .width(lineWidth)
+                .height(cornerLength)
+                .background(lineColor)
         )
     }
 }
 
 
 @Composable
-private fun CameraBackButton(
+private fun CameraSmallButton(
+    icon: String,
     onClick: () -> Unit
 ) {
 
     Box(
         modifier = Modifier
+            .size(34.dp)
             .background(
-                Color.Black.copy(
-                    alpha = 0.70f
-                ),
-                RoundedCornerShape(
-                    9.dp
-                )
+                Color.Black.copy(alpha = 0.70f),
+                CircleShape
             )
             .pointerInput(Unit) {
 
@@ -881,31 +1087,22 @@ private fun CameraBackButton(
                         onClick()
                     }
                 )
-            }
-            .padding(
-                horizontal = 14.dp,
-                vertical = 9.dp
-            ),
+            },
 
         contentAlignment =
             Alignment.Center
     ) {
 
         Text(
-            text =
-                "← BACK",
+            text = icon,
 
-            color =
-                Color.White,
+            color = Color.White,
 
-            fontFamily =
-                GameFont,
+            fontFamily = GameFont,
 
-            fontSize =
-                9.sp,
+            fontSize = 13.sp,
 
-            fontWeight =
-                FontWeight.Black
+            fontWeight = FontWeight.Black
         )
     }
 }
@@ -1007,14 +1204,16 @@ private fun CameraPermissionScreen(
         Box(
             modifier = Modifier
                 .align(
-                    Alignment.BottomEnd
+                    Alignment.TopEnd
                 )
                 .padding(
-                    10.dp
+                    top = 35.dp,
+                    end = 10.dp
                 )
         ) {
 
-            CameraBackButton(
+            CameraSmallButton(
+                icon = "←",
                 onClick = onBack
             )
         }

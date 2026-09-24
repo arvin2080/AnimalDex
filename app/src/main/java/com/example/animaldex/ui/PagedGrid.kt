@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -20,7 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -31,6 +35,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.PI
 import kotlinx.coroutines.delay
 
 import com.example.animaldex.model.Animal
@@ -48,6 +55,66 @@ val UndiscoveredCardColor = Color(0xFF3A3A3D)
 private const val RevealPreDelayMs = 200L
 private const val RevealFillDurationMs = 700
 private const val RevealHoldDelayMs = 400L
+
+// Étincelles qui jaillissent de la case une fois le remplissage
+// terminé — purement décoratif, ne touche pas au minutage de
+// l'enchaînement (remplissage -> pause -> zoom).
+private const val SparkleDurationMs = 550
+
+private data class SparkleParticle(
+    val angleDegrees: Float,
+    val distanceDp: Float,
+    val sizeDp: Float,
+    val delayFraction: Float
+)
+
+private val RevealSparkles: List<SparkleParticle> =
+    listOf(
+        SparkleParticle(20f, 78f, 5f, 0.00f),
+        SparkleParticle(65f, 88f, 4f, 0.08f),
+        SparkleParticle(100f, 72f, 6f, 0.03f),
+        SparkleParticle(140f, 92f, 4f, 0.15f),
+        SparkleParticle(180f, 80f, 5f, 0.05f),
+        SparkleParticle(220f, 85f, 4f, 0.12f),
+        SparkleParticle(260f, 74f, 6f, 0.02f),
+        SparkleParticle(300f, 90f, 4f, 0.18f),
+        SparkleParticle(340f, 76f, 5f, 0.07f)
+    )
+
+
+// Dessine une étincelle à 4 pointes (style clipart) à une position,
+// taille et transparence données.
+private fun DrawScope.drawSparkle(
+    center: Offset,
+    armLength: Float,
+    color: Color,
+    alpha: Float
+) {
+
+    if (alpha <= 0f) return
+
+    val thin = armLength * 0.28f
+
+    val path = Path().apply {
+
+        moveTo(center.x, center.y - armLength)
+        lineTo(center.x + thin, center.y)
+        lineTo(center.x, center.y + armLength)
+        lineTo(center.x - thin, center.y)
+        close()
+
+        moveTo(center.x - armLength, center.y)
+        lineTo(center.x, center.y - thin)
+        lineTo(center.x + armLength, center.y)
+        lineTo(center.x, center.y + thin)
+        close()
+    }
+
+    drawPath(
+        path = path,
+        color = color.copy(alpha = alpha)
+    )
+}
 
 
 fun isConfirmKey(
@@ -886,12 +953,16 @@ fun AnimalGridItem(
     onRevealFillComplete: () -> Unit = {}
 ) {
 
-    // Fraction de remplissage de l'overlay coloré, animée de 0 (case
-    // grise) à 1 (entièrement à la couleur du continent) uniquement
-    // quand isRevealing est vrai — sinon reste à 0 et n'est jamais
-    // dessiné (voir plus bas), donc aucun changement visuel pour les
-    // cases normales.
     val fillFraction =
+        remember {
+            Animatable(0f)
+        }
+
+    var sparklesTriggered by remember {
+        mutableStateOf(false)
+    }
+
+    val sparkleProgress =
         remember {
             Animatable(0f)
         }
@@ -908,9 +979,25 @@ fun AnimalGridItem(
                 animationSpec = tween(RevealFillDurationMs)
             )
 
+            sparklesTriggered = true
+
             delay(RevealHoldDelayMs)
 
             onRevealFillComplete()
+        }
+    }
+
+
+    LaunchedEffect(sparklesTriggered) {
+
+        if (sparklesTriggered) {
+
+            sparkleProgress.snapTo(0f)
+
+            sparkleProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(SparkleDurationMs)
+            )
         }
     }
 
@@ -937,111 +1024,130 @@ fun AnimalGridItem(
     ) {
 
         Box(
-            modifier = Modifier
-                .size(
-                    if (selected) {
-                        140.dp
-                    } else {
-                        150.dp
-                    }
-                )
-                .background(
-                    color =
-
-                        // Pendant l'animation de révélation, la case
-                        // démarre systématiquement grise, même si
-                        // animal.discovered est déjà vrai en mémoire
-                        // (mis à jour avant la navigation) — c'est
-                        // l'overlay ci-dessous qui simule le passage
-                        // du gris à la couleur du continent.
-                        if (isRevealing) {
-                            UndiscoveredCardColor
-                        } else if (animal.discovered) {
-                            continentColor
-                        } else {
-                            UndiscoveredCardColor
-                        },
-
-                    shape =
-                        RoundedCornerShape(
-                            11.dp
-                        )
-                )
-                .then(
-                    if (selected) {
-                        Modifier.background(
-                            Color.White.copy(alpha = 0.25f),
-                            RoundedCornerShape(11.dp)
-                        )
-                    } else {
-                        Modifier
-                    }
-                )
-                .padding(6.dp),
-
             contentAlignment =
                 Alignment.Center
         ) {
 
-            // Overlay de remplissage, ancré en bas, qui grossit vers
-            // le haut au fil de l'animation.
-            if (isRevealing) {
+            Box(
+                modifier = Modifier
+                    .size(
+                        if (selected) {
+                            140.dp
+                        } else {
+                            150.dp
+                        }
+                    )
+                    .background(
+                        color =
+                            if (isRevealing) {
+                                UndiscoveredCardColor
+                            } else if (animal.discovered) {
+                                continentColor
+                            } else {
+                                UndiscoveredCardColor
+                            },
 
-                Box(
+                        shape =
+                            RoundedCornerShape(
+                                11.dp
+                            )
+                    )
+                    .then(
+                        if (selected) {
+                            Modifier.background(
+                                Color.White.copy(alpha = 0.25f),
+                                RoundedCornerShape(11.dp)
+                            )
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .padding(6.dp),
+
+                contentAlignment =
+                    Alignment.Center
+            ) {
+
+                if (isRevealing) {
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .fillMaxHeight(
+                                fillFraction.value
+                            )
+                            .background(
+                                continentColor,
+                                RoundedCornerShape(11.dp)
+                            )
+                    )
+                }
+
+
+                if (
+                    animal.localImagePath
+                        .isNullOrBlank()
+                ) {
+
+                    Text(
+                        text = "?",
+
+                        color = Color.White,
+
+                        fontFamily = GameFont,
+
+                        fontSize = 35.sp,
+
+                        fontWeight =
+                            FontWeight.Black
+                    )
+
+                } else {
+
+                    AsyncImage(
+                        model =
+                            animal.localImagePath,
+
+                        contentDescription =
+                            animal.displayName,
+
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .fillMaxSize(0.55f),
+
+                        contentScale =
+                            ContentScale.Fit
+                    )
+                }
+
+                if (animal.discovered) {
+
+                    Text(
+                        text = "✓",
+
+                        color = Color.White,
+
+                        fontFamily = GameFont,
+
+                        fontSize = 10.sp,
+
+                        fontWeight = FontWeight.Black,
+
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(3.dp)
+                    )
+                }
+
+                Text(
+                    text =
+                        animal.displayName.uppercase(),
+
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .fillMaxHeight(
-                            fillFraction.value
-                        )
-                        .background(
-                            continentColor,
-                            RoundedCornerShape(11.dp)
-                        )
-                )
-            }
-
-
-            if (
-                animal.localImagePath
-                    .isNullOrBlank()
-            ) {
-
-                Text(
-                    text = "?",
-
-                    color = Color.White,
-
-                    fontFamily = GameFont,
-
-                    fontSize = 35.sp,
-
-                    fontWeight =
-                        FontWeight.Black
-                )
-
-            } else {
-
-                AsyncImage(
-                    model =
-                        animal.localImagePath,
-
-                    contentDescription =
-                        animal.displayName,
-
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .fillMaxSize(0.55f),
-
-                    contentScale =
-                        ContentScale.Fit
-                )
-            }
-
-            if (animal.discovered) {
-
-                Text(
-                    text = "✓",
+                        .padding(2.dp),
 
                     color = Color.White,
 
@@ -1049,42 +1155,89 @@ fun AnimalGridItem(
 
                     fontSize = 10.sp,
 
-                    fontWeight = FontWeight.Black,
+                    fontWeight =
+                        FontWeight.Black,
 
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(3.dp)
+                    maxLines = 2,
+
+                    lineHeight = 10.sp,
+
+                    overflow =
+                        TextOverflow.Ellipsis,
+
+                    textAlign =
+                        TextAlign.Center
                 )
             }
 
-            Text(
-                text =
-                    animal.displayName.uppercase(),
 
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(2.dp),
+            // Étincelles, dessinées par-dessus, capables de déborder
+            // au-delà du bord de la case (unbounded = ignore la
+            // contrainte de largeur étroite imposée par la colonne
+            // de la grille).
+            if (sparklesTriggered) {
 
-                color = Color.White,
+                Canvas(
+                    modifier = Modifier
+                        .size(220.dp)
+                        .wrapContentSize(unbounded = true)
+                ) {
 
-                fontFamily = GameFont,
+                    val centerOffset =
+                        Offset(
+                            size.width / 2f,
+                            size.height / 2f
+                        )
 
-                fontSize = 10.sp,
+                    RevealSparkles.forEach { sparkle ->
 
-                fontWeight =
-                    FontWeight.Black,
+                        val localProgress =
+                            (
+                                    (sparkleProgress.value - sparkle.delayFraction) /
+                                            (1f - sparkle.delayFraction)
+                                    ).coerceIn(0f, 1f)
 
-                maxLines = 2,
+                        if (localProgress <= 0f) {
+                            return@forEach
+                        }
 
-                lineHeight = 10.sp,
+                        val eased =
+                            1f - (1f - localProgress) * (1f - localProgress)
 
-                overflow =
-                    TextOverflow.Ellipsis,
+                        val angleRad =
+                            sparkle.angleDegrees * (PI.toFloat() / 180f)
 
-                textAlign =
-                    TextAlign.Center
-            )
+                        val distancePx =
+                            sparkle.distanceDp.dp.toPx() * eased
+
+                        val sparkleCenter =
+                            Offset(
+                                centerOffset.x + cos(angleRad) * distancePx,
+                                centerOffset.y + sin(angleRad) * distancePx
+                            )
+
+                        val alpha =
+                            when {
+
+                                localProgress < 0.15f ->
+                                    localProgress / 0.15f
+
+                                localProgress < 0.5f ->
+                                    1f
+
+                                else ->
+                                    (1f - localProgress) / 0.5f
+                            }
+
+                        drawSparkle(
+                            center = sparkleCenter,
+                            armLength = sparkle.sizeDp.dp.toPx(),
+                            color = Color.White,
+                            alpha = alpha
+                        )
+                    }
+                }
+            }
         }
     }
 }

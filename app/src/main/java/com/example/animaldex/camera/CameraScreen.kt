@@ -3,6 +3,7 @@ package com.example.animaldex.camera
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.util.Log
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -354,6 +355,11 @@ private fun CameraPreview(
                                         identifyPhoto(context, jpeg)
                                     }
 
+                                Log.d(
+                                    "AnimalDexDebug",
+                                    "Reponse IA brute -> scientific='${identification.scientificName}' common='${identification.commonName}'"
+                                )
+
                                 val animal =
                                     matchAnimal(animals, identification)
 
@@ -372,6 +378,11 @@ private fun CameraPreview(
                             } catch (
                                 error: Exception
                             ) {
+
+                                Log.d(
+                                    "AnimalDexDebug",
+                                    "Erreur pendant l'identification -> ${error.message}"
+                                )
 
                                 failureMessage =
                                     error.message
@@ -410,6 +421,11 @@ private fun CameraPreview(
 
                                         hasNilgiri && hasLangur
                                     }
+
+                                Log.d(
+                                    "AnimalDexDebug",
+                                    "Bloc de test -> declenche, trouve='${testFallback?.displayName}'"
+                                )
 
                                 if (testFallback != null) {
 
